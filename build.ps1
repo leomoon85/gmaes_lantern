@@ -19,7 +19,10 @@ New-Item -ItemType Directory -Force -Path (Split-Path $Output) | Out-Null
 Check-Exit
 & "$Java\bin\java.exe" -cp "$Work\tests" com.lantern.dispatch.GameTest
 Check-Exit
-& "$tools\aapt.exe" package -f -M "$PSScriptRoot\AndroidManifest.xml" -S "$PSScriptRoot\res" -I $android -F "$Work\base.apk"
+$browserHtml = [IO.File]::ReadAllText("$PSScriptRoot\assets\index.html").Replace('href="bulletins.css"', 'href="assets/bulletins.css"').Replace('src="bulletins.js"', 'src="assets/bulletins.js"').Replace('src="history-data.js"', 'src="assets/history-data.js"')
+$browserHtml = $browserHtml.Replace('href="map-feedback.css"', 'href="assets/map-feedback.css"').Replace('src="map-runtime.js"', 'src="assets/map-runtime.js"').Replace('href="gameplay-modes.css"', 'href="assets/gameplay-modes.css"').Replace('src="gameplay-modes.js"', 'src="assets/gameplay-modes.js"')
+[IO.File]::WriteAllText("$PSScriptRoot\index.html", $browserHtml, [Text.UTF8Encoding]::new($false))
+& "$tools\aapt.exe" package -f -M "$PSScriptRoot\AndroidManifest.xml" -S "$PSScriptRoot\res" -A "$PSScriptRoot\assets" -I $android -F "$Work\base.apk"
 Check-Exit
 $sources = Get-ChildItem -LiteralPath "$PSScriptRoot\src" -Recurse -Filter '*.java' | ForEach-Object { $_.FullName }
 & "$Java\bin\javac.exe" -encoding UTF-8 -source 8 -target 8 -bootclasspath "$android;$tools\core-lambda-stubs.jar" -d "$Work\classes" @sources

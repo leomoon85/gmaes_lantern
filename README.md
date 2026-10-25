@@ -1,5 +1,15 @@
 # Lantern Dispatch — Mobility Empire
 
+### Historical newspaper update
+
+The current WebView build includes **The Lantern Ledger**: newspaper popups that pause play, link to their sources, explain the gameplay context, and remain in a local archive. The bundled dataset currently contains 14 historical news/events across the six city campaigns and 11 historical Uber/Lyft price observations. Editions unlock against an internal calendar (50 simulated seconds per year); where a report was published after its event, the report waits until its publication date.
+
+Finance includes a separate historical USD price archive with ticker, exchange, observation date, price type, and source. These are selected IPO prices and quarter-end closes from 2019–2021, **not a complete daily price series**. Missing dates are not interpolated. The tradable fictional rivals still use the simulation economy. Historical facts do not imply that simulated market movements occurred in the real world.
+
+Historical text is paraphrased from linked official announcements, regulatory records, SEC filings, and one contemporaneous newspaper report. Content works offline; opening external sources requires a connection. See `assets/history-data.js` for the curated dataset. Historical editions replace the previous unsourced city timeline headlines; vehicle descriptions and tariffs elsewhere remain prototype content and have not received a full historical audit.
+
+Run `node tests/bulletins.cjs` for newspaper/date/price checks and `node tests/journey.cjs` for chapter checks. These browser tests currently use the workstation's bundled Playwright package and Microsoft Edge. Android simulation checks run during `build.ps1`; on-device touch and lifecycle verification remains outstanding.
+
 An original offline Android management game about building a mobility company from Bengaluru into a national network. **Lantern Dispatch is a working title, not a cleared trademark.** Version 0.2.0 is a development prototype.
 
 ![Desktop layout preview of the dispatch screen](preview-0.png)

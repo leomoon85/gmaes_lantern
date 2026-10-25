@@ -1,5 +1,15 @@
 # Historical context and invented simulation effects
 
+## Current WebView newspaper dataset
+
+The current implementation uses `assets/history-data.js` as the source of truth for 14 sourced historical event records and 11 selected historical share-price observations. Each record includes its event/observation date and a source URL. Publication dates are recorded separately for retrospective reports. The newspaper unlocks records by campaign date; the city timeline uses this dataset instead of its older embedded headlines.
+
+Real companies may be named in historical reporting. The playable rivals remain fictional. Historical quotes are reference observations in USD, not tradable rival prices, not live quotes, and not a full daily series. The dataset includes Lyft's US$72 IPO offer and Uber's US$45 IPO offer, eight Lyft quarter-end closes through March 2021, and Uber's December 2020 quarter-end close. Quote types remain distinct. The bank pricing supplements reproduce historical market tables and can reflect corporate-action adjustments; SEC hosting is not an endorsement or independent validation by the SEC.
+
+Examples of corrections: New York's congestion-zone toll launch is dated 5 January 2025; the November 2022 Namma Yatri launch record does not claim a ₹25/day subscription launch fee; the game's one-time 52% fictional rival price reduction is explicitly separated from real share returns. Legacy vehicle/tariff descriptions have not been comprehensively verified.
+
+The original Java prototype notes below describe the earlier implementation and should not be read as a specification of the current WebView dataset.
+
 The campaign draws on public historical facts, paraphrased here. The playable rivals are fictional and do not stand for particular real businesses. Historical company names and logos do not appear in the game. Source websites necessarily identify their own subjects; those references do not imply endorsement or a licence to use their branding.
 
 | Period | Documented context | Invented campaign interpretation |

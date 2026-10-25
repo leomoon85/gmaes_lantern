@@ -1,0 +1,6 @@
+.map-feedback { position:fixed; top:222px; right:14px; z-index:19; max-width:280px; padding:9px 12px; border:1px solid #b8cec030; border-radius:10px; color:#c5d8ce; background:#142623f2; font-size:11px; line-height:1.5; }
+.map-feedback small { display:block; font-size:9px; color:#9baea8; }
+.map-feedback a { color:inherit; }
+.map-feedback button { margin-top:7px; background:#a7d9cd18; color:#e2e9dc; border:1px solid #a7d9cd55; border-radius:6px; padding:8px 12px; cursor:pointer; }
+@media(max-height:600px) and (min-width:651px) { .map-feedback { top:192px; max-width:240px; } }
+@media(max-width:650px) { .map-feedback { top:auto; bottom:calc(176px + var(--safe-bottom)); right:10px; max-width:250px; padding:6px 10px; } }

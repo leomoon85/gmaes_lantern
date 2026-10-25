@@ -1,0 +1,182 @@
+/* Gameplay Modes Hub (Solo Quick Play, 20 Railroad-Tycoon Historical Scenarios, Interactive Tutorial) */
+.mode-pill-btn {
+  background: linear-gradient(135deg, rgba(243, 188, 112, 0.24), rgba(167, 217, 205, 0.18)) !important;
+  border: 1px solid rgba(243, 188, 112, 0.55) !important;
+  color: #f9e3b8 !important;
+  font-weight: 800;
+}
+
+.mode-modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  background: rgba(6, 13, 20, 0.78);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+}
+.mode-modal-mask[hidden] { display: none !important; }
+
+.mode-modal-card {
+  width: min(940px, 100%);
+  max-height: min(88vh, 820px);
+  background: linear-gradient(160deg, rgba(18, 33, 31, 0.98), rgba(11, 22, 24, 0.98));
+  border: 1px solid rgba(243, 188, 112, 0.42);
+  border-radius: 20px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.65);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: #edf5f0;
+}
+
+.mode-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(188, 211, 199, 0.16);
+  background: rgba(10, 20, 20, 0.65);
+}
+.mode-header-title {
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: var(--gold);
+  text-transform: uppercase;
+}
+
+.mode-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 10px 18px;
+  border-bottom: 1px solid rgba(188, 211, 199, 0.14);
+  background: rgba(14, 26, 25, 0.8);
+  overflow-x: auto;
+}
+.mode-tab-btn {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(188, 211, 199, 0.22);
+  background: rgba(255, 255, 255, 0.04);
+  color: #b9cdc4;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.mode-tab-btn.active {
+  background: rgba(243, 188, 112, 0.22);
+  border-color: var(--gold);
+  color: #fff3d6;
+}
+
+.mode-body {
+  padding: 16px 18px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.scen-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(275px, 1fr));
+  gap: 10px;
+}
+
+.scen-card {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(188, 211, 199, 0.18);
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+}
+.scen-card.active {
+  border-color: var(--gold);
+  background: rgba(243, 188, 112, 0.09);
+}
+
+.scen-era {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cyan);
+}
+.scen-title {
+  font-size: 13.5px;
+  font-weight: 900;
+  color: #f5f9f6;
+  margin-top: 2px;
+}
+.scen-desc {
+  font-size: 11px;
+  line-height: 1.45;
+  color: #b4c7be;
+}
+.medal-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 7px 9px;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 10.5px;
+  color: #d8e6df;
+}
+
+/* Interactive Tutorial Floating Coach Bar */
+.tutorial-banner {
+  position: fixed;
+  top: 136px;
+  right: 14px;
+  width: min(370px, calc(100vw - 28px));
+  z-index: 28;
+  background: linear-gradient(145deg, rgba(22, 42, 37, 0.97), rgba(12, 24, 23, 0.97));
+  border: 1.5px solid var(--gold);
+  border-radius: 16px;
+  padding: 12px 14px;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.55);
+  color: #f0f5f1;
+}
+.tutorial-banner[hidden] { display: none !important; }
+.tut-step-tag {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.tut-title {
+  font-size: 14px;
+  font-weight: 900;
+  margin: 4px 0;
+  color: #ffffff;
+}
+.tut-copy {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #c2d4cb;
+  margin-bottom: 8px;
+}
+.tut-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+@media (max-width: 650px) {
+  .tutorial-banner {
+    top: auto;
+    bottom: 152px;
+    left: 10px;
+    right: 10px;
+    width: auto;
+  }
+}

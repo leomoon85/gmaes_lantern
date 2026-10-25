@@ -1,0 +1,2935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Lantern Tycoon — Real-World Mobility & Rail Empire</title>
+<style>
+  :root {
+    --bg-void: #040811;
+    --glass-heavy: rgba(7, 14, 26, 0.90);
+    --glass-lite: rgba(15, 28, 46, 0.78);
+    --border-neon: rgba(0, 242, 254, 0.30);
+    --cyan: #00f2fe;
+    --mint: #38f9d7;
+    --gold: #ffcb52;
+    --magenta: #ff4ecd;
+    --coral: #ff6464;
+    --violet: #a97aff;
+    --text-bright: #f5f9ff;
+    --text-dim: #88a4c4;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  * {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #040811;
+    color: var(--text-bright);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  #mapCanvas {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    touch-action: none;
+    display: block;
+    z-index: 1;
+  }
+  .holo-vignette {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+    background:
+      radial-gradient(circle at 50% 50%, transparent 62%, rgba(2, 6, 14, 0.62) 100%),
+      linear-gradient(180deg, rgba(4, 10, 20, 0.55) 0%, transparent 16%, transparent 84%, rgba(4, 10, 20, 0.72) 100%);
+  }
+
+  /* TOP FLOATING TELEMETRY COMMAND BAR */
+  .top-hud {
+    position: fixed;
+    top: calc(8px + var(--safe-top));
+    left: 10px;
+    right: 10px;
+    z-index: 15;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    pointer-events: none;
+  }
+  .telemetry-bar {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 13px;
+    background: var(--glass-heavy);
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+    border: 1px solid var(--border-neon);
+    border-radius: 18px;
+    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255,255,255,0.1);
+  }
+  .logo-cluster {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .logo-badge {
+    width: 34px;
+    height: 34px;
+    border-radius: 11px;
+    background: linear-gradient(135deg, var(--cyan), var(--mint));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 900;
+    color: #03101e;
+    box-shadow: 0 0 18px rgba(0, 242, 254, 0.55);
+  }
+  .logo-name {
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    background: linear-gradient(90deg, #fff, var(--cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .logo-tag {
+    font-size: 8.5px;
+    letter-spacing: 0.12em;
+    color: var(--gold);
+    font-weight: 800;
+    display: block;
+  }
+  .kpi-row {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .kpi-row::-webkit-scrollbar { display: none; }
+  .kpi {
+    display: flex;
+    flex-direction: column;
+    min-width: max-content;
+  }
+  .kpi-lbl {
+    font-size: 8.5px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+  .kpi-num {
+    font-size: 14.5px;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+  .kpi-num.cyan { color: var(--cyan); }
+  .kpi-num.mint { color: var(--mint); }
+  .kpi-num.gold { color: var(--gold); }
+  .kpi-num.danger { color: var(--coral); }
+
+  .control-strip {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .pill-cluster {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .cyber-pill {
+    background: var(--glass-heavy);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.14);
+    color: var(--text-bright);
+    padding: 6px 11px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+    transition: all 0.15s ease;
+  }
+  .cyber-pill:active { transform: scale(0.94); }
+  .cyber-pill.glow-mint {
+    background: rgba(56, 249, 215, 0.16);
+    border-color: var(--mint);
+    color: var(--mint);
+  }
+  .cyber-pill.glow-gold {
+    background: rgba(255, 203, 82, 0.18);
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+  .led {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-dim);
+  }
+  .led.on {
+    background: var(--mint);
+    box-shadow: 0 0 9px var(--mint);
+  }
+
+  .event-pill {
+    pointer-events: auto;
+    align-self: center;
+    background: rgba(7, 15, 28, 0.92);
+    border: 1px solid rgba(255, 203, 82, 0.4);
+    color: #fff;
+    padding: 5px 15px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 600;
+    max-width: 94vw;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-shadow: 0 8px 22px rgba(0,0,0,0.55);
+  }
+
+  /* ON-MAP CONTEXTUAL STATION & CORRIDOR POPOVER */
+  .hub-popover {
+    position: fixed;
+    left: 50%;
+    top: 136px;
+    transform: translateX(-50%) scale(0.95);
+    z-index: 16;
+    background: var(--glass-heavy);
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+    border: 1px solid var(--cyan);
+    border-radius: 18px;
+    padding: 10px 14px;
+    min-width: 290px;
+    max-width: 94vw;
+    box-shadow: 0 14px 36px rgba(0,0,0,0.7), 0 0 22px rgba(0, 242, 254, 0.25);
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.18s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .hub-popover.visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(-50%) scale(1);
+  }
+
+  /* FLOATING CARGO & CONSIST TELEMETRY DECK */
+  .ride-deck {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: calc(74px + var(--safe-bottom));
+    z-index: 12;
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding: 4px 2px 6px 2px;
+    scrollbar-width: none;
+  }
+  .ride-deck::-webkit-scrollbar { display: none; }
+  .ride-ticket {
+    min-width: 235px;
+    max-width: 260px;
+    flex: 0 0 auto;
+    background: var(--glass-heavy);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 18px;
+    padding: 10px 13px;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.6);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.14s ease, border-color 0.14s ease;
+  }
+  .ride-ticket:active {
+    transform: scale(0.95);
+    border-color: var(--cyan);
+  }
+  .ticket-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .class-pill {
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.08);
+  }
+  .ticket-fare {
+    font-size: 13.5px;
+    font-weight: 900;
+    color: var(--gold);
+  }
+  .ticket-origin {
+    font-size: 13px;
+    font-weight: 800;
+    color: #fff;
+  }
+  .ticket-dest {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .send-tag {
+    color: var(--cyan);
+    font-weight: 900;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+  }
+  .timer-strip {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 3.5px;
+    background: linear-gradient(90deg, var(--cyan), var(--gold));
+  }
+
+  /* SLIDE-UP COMMAND DRAWER */
+  .drawer-mask {
+    position: fixed;
+    inset: 0;
+    background: rgba(2, 6, 14, 0.52);
+    z-index: 20;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease;
+  }
+  .drawer-mask.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .command-drawer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(68px + var(--safe-bottom));
+    max-height: 74vh;
+    background: rgba(8, 16, 30, 0.95);
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
+    border-top: 1px solid var(--border-neon);
+    border-radius: 26px 26px 0 0;
+    z-index: 22;
+    transform: translateY(112%);
+    transition: transform 0.28s cubic-bezier(0.19, 1, 0.22, 1);
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 -16px 48px rgba(0,0,0,0.7);
+  }
+  .command-drawer.open {
+    transform: translateY(0%);
+  }
+  @media (min-width: 900px) {
+    .command-drawer {
+      left: auto;
+      right: 14px;
+      width: 465px;
+      bottom: calc(74px + var(--safe-bottom));
+      max-height: calc(100vh - 160px);
+      border: 1px solid var(--border-neon);
+      border-radius: 24px;
+    }
+  }
+  .drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 13px 18px 10px 18px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .drawer-title {
+    font-size: 13.5px;
+    font-weight: 900;
+    letter-spacing: 0.09em;
+    color: var(--cyan);
+    text-transform: uppercase;
+  }
+  .drawer-close {
+    background: rgba(255,255,255,0.09);
+    border: none;
+    color: #fff;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .drawer-content {
+    padding: 14px 16px 22px 16px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .holo-card {
+    background: var(--glass-lite);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 18px;
+    padding: 13px 15px;
+  }
+  .flex-between {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .h-title {
+    font-size: 14.5px;
+    font-weight: 800;
+    color: #fff;
+  }
+  .h-desc {
+    font-size: 11.5px;
+    color: var(--text-dim);
+    margin-top: 3px;
+    line-height: 1.4;
+  }
+  .btn-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(115px, 1fr));
+    gap: 7px;
+    margin-top: 9px;
+  }
+  .cyber-btn {
+    background: linear-gradient(135deg, rgba(0, 242, 254, 0.2), rgba(56, 249, 215, 0.08));
+    border: 1px solid rgba(0, 242, 254, 0.45);
+    color: var(--cyan);
+    padding: 9px 11px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+    text-align: center;
+    transition: transform 0.1s ease;
+  }
+  .cyber-btn:active { transform: scale(0.96); }
+  .cyber-btn.gold {
+    background: linear-gradient(135deg, rgba(255, 203, 82, 0.24), rgba(255, 203, 82, 0.08));
+    border-color: rgba(255, 203, 82, 0.5);
+    color: var(--gold);
+  }
+  .cyber-btn.dim {
+    background: rgba(255,255,255,0.06);
+    border-color: rgba(255,255,255,0.12);
+    color: var(--text-dim);
+  }
+  .fleet-badge {
+    font-size: 10px;
+    font-weight: 800;
+    padding: 4px 8px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+  }
+
+  /* BOTTOM THUMB NAVIGATION DOCK */
+  .nav-dock {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: calc(8px + var(--safe-bottom));
+    height: 58px;
+    background: var(--glass-heavy);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--border-neon);
+    border-radius: 20px;
+    z-index: 25;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 4px;
+    padding: 5px;
+    box-shadow: 0 14px 38px rgba(0,0,0,0.65);
+  }
+  .dock-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: all 0.16s ease;
+  }
+  .dock-btn .ico { font-size: 16px; line-height: 1; }
+  .dock-btn.active {
+    background: linear-gradient(135deg, rgba(0, 242, 254, 0.25), rgba(255, 203, 82, 0.18));
+    color: #fff;
+    border: 1px solid rgba(0, 242, 254, 0.5);
+    box-shadow: 0 0 18px rgba(0, 242, 254, 0.22);
+  }
+  .qual-bars {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .q-pill {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 5px 8px;
+    font-size: 10px;
+  }
+  .q-track {
+    height: 5px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 3px;
+  }
+  .q-fill { height: 100%; border-radius: 4px; }
+
+/* A calmer command surface: city first, one decision at a time. */
+:root { --cyan:#a7d9cd; --mint:#a7d9cd; --gold:#f3bc70; --text-dim:#9baea8; --border-neon:rgba(188,211,199,.18); --glass-heavy:rgba(17,30,29,.96); --glass-lite:rgba(29,45,41,.94); }
+.telemetry-bar,.nav-dock,.command-drawer,.holo-card { box-shadow:0 8px 28px #0003; backdrop-filter:blur(14px); }
+.command-drawer:not(.open) { visibility:hidden; pointer-events:none; }
+.telemetry-bar { border-radius:14px; padding:10px 16px; }
+.logo-name { letter-spacing:.08em; } .logo-tag { letter-spacing:.06em; }
+.control-strip { justify-content:flex-end; } .control-strip>.pill-cluster:first-child { margin-right:auto; }
+.control-strip>.pill-cluster:first-child>button:nth-child(-n+4) { display:none; }
+body.show-options .control-strip>.pill-cluster:first-child>button:nth-child(-n+4) { display:inline-flex; }
+.cyber-pill { box-shadow:none!important; background:#142623; border-color:#bcd3c730; min-height:40px; }
+.event-pill { max-width:620px; font-size:11px; background:#142623e8; border-color:#bcd3c722; }
+.nav-dock { left:50%; right:auto; transform:translateX(-50%); width:min(560px,calc(100% - 20px)); border-radius:16px; }
+.dock-btn.active { background:#a7d9cd1f; border-color:#a7d9cd55; box-shadow:none; color:#dcebe1; }
+.cyber-btn { background:#a7d9cd12; border-color:#a7d9cd40; min-height:42px; color:#c8e5d9; }
+.ride-ticket { background:#142623f2; border-color:#bcd3c72b; box-shadow:0 6px 20px #0003; }
+.journey { position:fixed; top:180px; left:14px; width:292px; z-index:16; padding:20px; border:1px solid #c8dfcc35; border-radius:18px; background:linear-gradient(150deg,#243c32f5,#142623f5); box-shadow:0 16px 48px #0004; }
+.journey-eyebrow { color:#f3bc70; font-size:10px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; }
+.journey h2 { margin:10px 0 8px; font-size:25px; letter-spacing:-.04em; line-height:1.1; color:#f0f1de; }
+.journey p { margin:0 0 14px; font-size:12px; line-height:1.65; color:#b7c8bc; }
+.journey-progress { height:5px; background:#ffffff16; border-radius:5px; overflow:hidden; }
+.journey-progress>div { height:100%; background:#f3bc70; transition:width .4s; }
+.journey-meta { display:flex; justify-content:space-between; margin:9px 0 14px; color:#c9d6cc; font-size:11px; }
+.journey-action { width:100%; border:0; border-radius:10px; background:#f3bc70; color:#242b22; min-height:44px; font-weight:800; cursor:pointer; }
+.journey-toggle { position:absolute; top:10px; right:10px; background:transparent; color:#c9d6cc; border:0; min-width:32px; min-height:32px; cursor:pointer; }
+.journey.compact { padding:13px 44px 13px 16px; } .journey.compact .journey-detail { display:none; }
+.journey.compact h2 { font-size:16px; margin:6px 0 0; }
+.journey-summary { margin-top:14px; border-top:1px solid #ffffff15; padding-top:12px; font-size:11px; color:#b7c8bc; line-height:1.6; }
+body.drawer-visible .journey { display:none; }
+button:focus-visible { outline:2px solid #f3bc70; outline-offset:3px; }
+@media(max-width:650px) { .journey { top:172px; left:10px; width:calc(100% - 20px); padding:14px; } .journey h2 { font-size:20px; margin-top:6px; } .journey p { margin-bottom:8px; } .journey-summary { display:none; } .journey-meta { margin:7px 0; } .journey-action { min-height:40px; } .kpi-row { gap:10px; } .event-pill { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } }
+@media(max-height:600px) and (min-width:651px) { .journey { top:145px; width:265px; padding:14px; } .journey h2 { font-size:21px; } .journey-summary { display:none; } .journey p { margin-bottom:8px; } .journey-meta { margin:7px 0; } }
+@media(min-width:651px) { .ride-deck { left:322px; } }
+@media(max-width:450px) { .telemetry-bar { padding:10px; gap:8px; } .logo-badge { display:none; } .logo-name { font-size:11px; } .logo-tag { font-size:7px; } .kpi-row { gap:8px; min-width:0; } .kpi-num { font-size:12px; } .kpi-lbl { font-size:7px; } .event-pill { display:none; } }
+@media(max-height:600px) and (min-width:651px) { .journey p { display:none; } .journey { top:145px; } .ride-deck { left:294px; } }
+@media(prefers-reduced-motion:reduce) { *,*::before,*::after { transition:none!important; } }
+
+</style>
+<link rel="stylesheet" href="assets/bulletins.css">
+<link rel="stylesheet" href="assets/map-feedback.css">
+<link rel="stylesheet" href="assets/gameplay-modes.css">
+</head>
+<body>
+
+<canvas id="mapCanvas"></canvas>
+<div class="map-feedback"><div id="mapHealth" role="status">Loading street map…</div><small id="mapCredits"></small><button id="mapRetry" onclick="retryMapTiles()" hidden>Retry map</button></div>
+<div class="holo-vignette"></div>
+
+<!-- TOP TELEMETRY HUD -->
+<div class="top-hud">
+  <div class="telemetry-bar">
+    <div class="logo-cluster" onclick="selectTab(5)">
+      <div class="logo-badge" id="cityFlag">🇮🇳</div>
+      <div>
+        <div class="logo-name" id="cityTitle">BENGALURU</div>
+        <span class="logo-tag" id="scenarioSub">2010–2025 TAXI REVOLUTION</span>
+      </div>
+    </div>
+    <div class="kpi-row">
+      <div class="kpi">
+        <span class="kpi-lbl" id="lblCash">Cash</span>
+        <span class="kpi-num cyan" id="hudCash">₹4,50,000</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-lbl" id="lblWorth">Net Worth</span>
+        <span class="kpi-num mint" id="hudWorth">₹8,20,000</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-lbl" id="lblRating">Reviews</span>
+        <span class="kpi-num gold" id="hudRating">4.85 ★</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-lbl" id="lblYear">Year</span>
+        <span class="kpi-num gold" id="hudYear">2010</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="control-strip">
+    <div class="pill-cluster">
+      <button class="cyber-pill glow-gold" onclick="cycleWorldCity()">
+        🌍 <span id="worldBtnLabel">NEXT CITY ▸</span>
+      </button>
+      <button class="cyber-pill" id="btnDiff" onclick="cycleDifficulty()">
+        🎚️ <span id="diffLabel">MEDIUM</span>
+      </button>
+      <button class="cyber-pill" id="btnMapStyle" onclick="cycleMapStyle()">
+        🗺️ <span id="mapStyleLabel">CYBER DARK</span>
+      </button>
+      <button class="cyber-pill" id="btnLang" onclick="cycleLanguage()">
+        🌐 <span id="langLabel">EN</span>
+      </button>
+      <button class="cyber-pill glow-mint" id="btnAuto" onclick="toggleAuto()">
+        <span class="led on" id="autoLed"></span>
+        <span id="autoLabel">AUTO: ON</span>
+      </button>
+      <button class="cyber-pill" id="btnSpeed" onclick="cycleSpeed()">
+        ⚡ <span id="speedLabel">1×</span>
+      </button>
+    </div>
+    <div class="pill-cluster">
+      <button class="cyber-pill mode-pill-btn" id="btnModes" onclick="openModeModal('scenarios')" aria-label="Game Modes">🎮 <span id="modeStatusLabel">MODES</span></button>
+      <button class="cyber-pill" onclick="toggleOptions()" aria-label="Show settings" id="optionsToggle" aria-expanded="false">⚙ Settings</button>
+      <button class="cyber-pill" onclick="zoomBy(1)" aria-label="Zoom in">➕</button>
+      <button class="cyber-pill" onclick="zoomBy(-1)">➖</button>
+      <button class="cyber-pill" onclick="resetCamera()">🎯 <span id="lblFit">FIT</span></button>
+    </div>
+  </div>
+
+  <div class="event-pill" id="hudMessage">
+    Real-world navigable map active! Pinch/drag to explore real streets & stations, or tap 🌍 NEXT CITY.
+  </div>
+</div>
+
+<aside class="journey" id="journey" aria-label="Company journey">
+  <button class="journey-toggle" id="journeyToggle" onclick="toggleJourney()" aria-label="Collapse goal" aria-expanded="true">−</button>
+  <div class="journey-eyebrow" id="journeyChapter"></div>
+  <h2 id="journeyTitle"></h2>
+  <div class="journey-detail">
+    <p id="journeyDescription"></p>
+    <div class="journey-progress" role="progressbar" aria-label="Chapter progress" aria-valuemin="0" aria-valuemax="100" id="journeyProgress"><div id="journeyFill"></div></div>
+    <div class="journey-meta"><span id="journeyCount"></span><span id="journeyReward"></span></div>
+    <button class="journey-action" id="journeyAction" onclick="journeyAction()"></button>
+    <div class="journey-summary" id="journeySummary"></div>
+  </div>
+</aside>
+<!-- ON-MAP STATION & CORRIDOR POPOVER -->
+<div class="hub-popover" id="hubPopover"></div>
+
+<!-- FLOATING CARGO / CONSIST DISPATCH DECK -->
+<div class="ride-deck" id="rideCarousel"></div>
+
+<!-- SLIDE-UP COMMAND DRAWER -->
+<div class="drawer-mask" id="sheetBackdrop" onclick="closeSheet()"></div>
+<div class="command-drawer" id="bottomSheet">
+  <div class="drawer-header">
+    <span class="drawer-title" id="sheetTitle">COMMAND</span>
+    <button class="drawer-close" onclick="closeSheet()">✕</button>
+  </div>
+  <div class="drawer-content" id="sheetBody"></div>
+</div>
+
+<!-- BOTTOM THUMB DOCK (6 TABS) -->
+<nav class="nav-dock">
+  <button class="dock-btn active" id="tab0" onclick="selectTab(0)">
+    <span class="ico">🛰️</span>
+    <span id="dockLbl0">MAP</span>
+  </button>
+  <button class="dock-btn" id="tab1" onclick="selectTab(1)">
+    <span class="ico">🚖</span>
+    <span id="dockLbl1">FLEET</span>
+  </button>
+  <button class="dock-btn" id="tab2" onclick="selectTab(2)">
+    <span class="ico">👨‍✈️</span>
+    <span id="dockLbl2">STAFF</span>
+  </button>
+  <button class="dock-btn" id="tab3" onclick="selectTab(3)">
+    <span class="ico">🛤️</span>
+    <span id="dockLbl3">HUBS</span>
+  </button>
+  <button class="dock-btn" id="tab4" onclick="selectTab(4)">
+    <span class="ico">📈</span>
+    <span id="dockLbl4">FINANCE</span>
+  </button>
+  <button class="dock-btn" id="tab5" onclick="selectTab(5)">
+    <span class="ico">🌍</span>
+    <span id="dockLbl5">CITIES</span>
+  </button>
+</nav>
+
+<div class="tutorial-banner" id="tutorialBanner" hidden aria-live="polite"></div>
+
+<div class="mode-modal-mask" id="modeModalMask" hidden role="dialog" aria-modal="true" aria-label="Gameplay Modes & Scenarios">
+  <div class="mode-modal-card">
+    <div class="mode-header">
+      <span class="mode-header-title">🎮 Gameplay Modes — Solo Quick Play · 20 Scenarios · Tutorial</span>
+      <button class="drawer-close" onclick="closeModeModal()" aria-label="Close modes">✕</button>
+    </div>
+    <div class="mode-tabs">
+      <button class="mode-tab-btn active" id="modeTab_scenarios" onclick="openModeModal('scenarios')">📜 1B. Solo: 20 Historical Scenarios</button>
+      <button class="mode-tab-btn" id="modeTab_quickplay" onclick="openModeModal('quickplay')">⚡ 1A. Solo: Quick Play (Custom Goal)</button>
+      <button class="mode-tab-btn" id="modeTab_tutorial" onclick="openModeModal('tutorial')">🎓 2. Interactive Tutorial</button>
+      <button class="mode-tab-btn" id="modeTab_countries" onclick="openModeModal('countries')">🌐 Multi-Country Branches</button>
+    </div>
+    <div class="mode-body" id="modeModalBody"></div>
+  </div>
+</div>
+
+<button class="press-button" id="pressButton" onclick="openPressArchive()" aria-haspopup="dialog">▤ News</button>
+<div class="press-overlay" id="pressOverlay" hidden role="dialog" aria-modal="true" aria-label="The Lantern Ledger">
+  <section class="press-paper">
+    <div class="press-masthead">The Lantern Ledger</div>
+    <div class="press-edition"><span id="pressEdition"></span><span>Simulation paused</span></div>
+    <article id="pressArticle"><h2 id="pressHeadline"></h2><div class="press-copy" id="pressCopy"></div><div class="press-impact" id="pressImpact"></div><a id="pressSource" target="_blank" rel="noopener noreferrer" hidden></a></article>
+    <div id="pressArchive" hidden></div>
+    <div class="press-actions"><button id="pressAction" onclick="closeBulletin(pressActive.tab)">Review company</button><button class="secondary" id="pressClose" onclick="closeBulletin()">Back to business</button></div>
+    <div class="press-note" id="pressNote">Historical records and your simulated company reports are labelled separately.</div>
+  </section>
+</div>
+<script src="assets/history-data.js"></script>
+<script src="assets/bulletins.js"></script>
+<script src="assets/map-runtime.js"></script>
+<script src="assets/gameplay-modes.js"></script>
+<script>
+const MAX_FLEET = 12, MAX_BONDS = 3, BOND_FACE = 5000;
+const IDLE = 0, PICKUP = 1, RIDING = 2, CHARGING = 3;
+const KIND_NAMES = ["COMMUTER PAX", "EXPRESS PARCEL", "TECH / CORP VIP", "AIRPORT / BULK"];
+const KIND_SHORT = ["PAX", "MAIL", "VIP", "CARGO"];
+const KIND_COLORS = ["#38f9d7", "#ffcb52", "#00f2fe", "#a97aff"];
+const FAC_MAINT = 1, FAC_LOUNGE = 2, FAC_CARGO = 4, FAC_CHARGER = 8;
+
+/*
+ * MAP TILE PROVIDERS (GOOGLE MAPS + CARTO DARK MATTER + OSM)
+ */
+const MAP_STYLES = [
+  { name: "CYBER DARK", url: (z, x, y) => `https://a.basemaps.cartocdn.com/dark_all/${z}/${x}/${y}.png`, filter: "brightness(1.15) contrast(1.15) saturate(1.3)" },
+  { name: "GOOGLE STREETS", url: (z, x, y) => `https://mt1.google.com/vt/lyrs=m&x=${x}&y=${y}&z=${z}`, filter: "invert(0.92) hue-rotate(185deg) brightness(0.95) contrast(1.15)" },
+  { name: "GOOGLE SATELLITE", url: (z, x, y) => `https://mt1.google.com/vt/lyrs=y&x=${x}&y=${y}&z=${z}`, filter: "brightness(0.82) contrast(1.15) saturate(1.15)" },
+  { name: "DAYLIGHT MAP", url: (z, x, y) => `https://mt1.google.com/vt/lyrs=m&x=${x}&y=${y}&z=${z}`, filter: "none" }
+];
+let mapStyleIdx = initialiseMapStyle();
+const tileCache = new Map();
+
+/*
+ * 6 FAMOUS WORLD CITIES WITH REAL GPS COORDINATES, REAL NEIGHBORHOOD NAMES,
+ * AND EACH CITY'S AUTHENTIC TAXI REVOLUTION TIMELINE & VEHICLES!
+ */
+const LANGUAGES = [
+  { code: "en", label: "EN", cash: "Cash", worth: "Net Worth", rating: "Reviews", year: "Year", nextCity: "NEXT CITY ▸", fit: "FIT", map: "MAP", fleet: "FLEET", staff: "STAFF", hubs: "HUBS", finance: "FINANCE", cities: "CITIES", dispatch: "DISPATCH ▸" },
+  { code: "hi", label: "हिं", cash: "नकद", worth: "कुल संपत्ति", rating: "रेटिंग", year: "वर्ष", nextCity: "अगला शहर ▸", fit: "फिट", map: "नक्शा", fleet: "गाड़ियाँ", staff: "स्टाफ", hubs: "स्टेशन", finance: "वित्त", cities: "शहर", dispatch: "भेजें ▸" },
+  { code: "kn", label: "ಕನ್ನಡ", cash: "ನಗದು", worth: "ಒಟ್ಟು ಮೌಲ್ಯ", rating: "ರೇಟಿಂಗ್", year: "ವರ್ಷ", nextCity: "ಮುಂದಿನ ನಗರ ▸", fit: "ಕೇಂದ್ರ", map: "ನಕ್ಷೆ", fleet: "ವಾಹನ", staff: "ಸಿಬ್ಬಂದಿ", hubs: "ನಿಲ್ದಾಣ", finance: "ಆರ್ಥಿಕ", cities: "ನಗರಗಳು", dispatch: "ಕಳುಹಿಸಿ ▸" },
+  { code: "ja", label: "日本語", cash: "資金", worth: "純資産", rating: "評価", year: "年", nextCity: "次の都市 ▸", fit: "全体", map: "地図", fleet: "車両", staff: "乗務員", hubs: "拠点", finance: "財務", cities: "都市", dispatch: "配車 ▸" },
+  { code: "es", label: "ES", cash: "Efectivo", worth: "Patrimonio", rating: "Reseñas", year: "Año", nextCity: "CIUDAD ▸", fit: "CENTRAR", map: "MAPA", fleet: "FLOTA", staff: "EQUIPO", hubs: "RUTAS", finance: "FINANZAS", cities: "CIUDADES", dispatch: "ENVIAR ▸" },
+  { code: "fr", label: "FR", cash: "Trésorerie", worth: "Valeur Nette", rating: "Avis", year: "Année", nextCity: "VILLE ▸", fit: "CENTRER", map: "CARTE", fleet: "FLOTTE", staff: "ÉQUIPE", hubs: "GARES", finance: "FINANCE", cities: "VILLES", dispatch: "ENVOYER ▸" }
+];
+let langIdx = 0;
+function curLang() { return LANGUAGES[langIdx] || LANGUAGES[0]; }
+function cycleLanguage() {
+  langIdx = (langIdx + 1) % LANGUAGES.length;
+  localStorage.setItem("lantern_lang_idx", String(langIdx));
+  refreshUI();
+}
+try {
+  const savedLang = parseInt(localStorage.getItem("lantern_lang_idx") || "0", 10);
+  if (savedLang >= 0 && savedLang < LANGUAGES.length) langIdx = savedLang;
+} catch (e) {}
+
+const DIFFICULTY_MODES = [
+  { id: 0, name: "EASIEST", badge: "🟢 EASIEST", startCashMult: 1.60, fareMult: 1.35, wearMult: 0.40, rivalMult: 0.45, upkeepMult: 0.50, patienceSec: 95, desc: "Sandbox Tycoon: +60% Starting Capital, +35% Fare Bonus, minimal wear/fatigue & 95s rider patience." },
+  { id: 1, name: "EASY", badge: "🩵 EASY", startCashMult: 1.30, fareMult: 1.15, wearMult: 0.65, rivalMult: 0.70, upkeepMult: 0.75, patienceSec: 80, desc: "Relaxed Dispatch: +30% Starting Capital, +15% Fare Bonus, reduced vehicle wear & 80s rider patience." },
+  { id: 2, name: "MEDIUM", badge: "🟡 MEDIUM", startCashMult: 1.00, fareMult: 1.00, wearMult: 1.00, rivalMult: 1.00, upkeepMult: 1.00, patienceSec: 65, desc: "Standard City Tariff: Authentic starting capital, standard regulatory fares, normal wear & 65s patience." },
+  { id: 3, name: "HIGH", badge: "🟠 HIGH", startCashMult: 0.80, fareMult: 0.90, wearMult: 1.35, rivalMult: 1.35, upkeepMult: 1.30, patienceSec: 52, desc: "Competitive Market: -20% Starting Capital, tighter 90% margins, 1.35× faster wear/rival poaching & 52s SLA." },
+  { id: 4, name: "PROFESSIONAL", badge: "🔴 PROFESSIONAL", startCashMult: 0.65, fareMult: 0.82, wearMult: 1.70, rivalMult: 1.75, upkeepMult: 1.60, patienceSec: 42, desc: "Pro Fleet Executive: Lean capital, razor-thin 82% margins, strict hygiene/maintenance & 42s executive SLA!" }
+];
+
+function curDiff() {
+  const idx = state && typeof state.difficulty === "number" ? state.difficulty : 2;
+  return DIFFICULTY_MODES[Math.max(0, Math.min(DIFFICULTY_MODES.length - 1, idx))];
+}
+
+function setDifficulty(idx) {
+  const d = DIFFICULTY_MODES[Math.max(0, Math.min(DIFFICULTY_MODES.length - 1, idx))];
+  state.difficulty = d.id;
+  state.message = `${d.badge} Mode Active — ${d.desc}`;
+  playTone(680 + d.id * 45, 0.12);
+  saveState();
+  refreshUI();
+}
+
+function cycleDifficulty() {
+  const next = ((state && typeof state.difficulty === "number" ? state.difficulty : 2) + 1) % DIFFICULTY_MODES.length;
+  setDifficulty(next);
+}
+
+const WORLD_SCENARIOS = [
+  {
+    id: 0, flag: "🇮🇳", city: "Bengaluru", country: "India",
+    currencySymbol: "₹", currencyCode: "INR", locale: "en-IN", fx: 16,
+    baseFare: 50, perKmRate: 19, tariffDesc: "KSTA / Namma Yatri Standard: ₹50 Base (2 km) + ₹19/km",
+    startYear: 2010, endYear: 2025,
+    centerLat: 12.9780, centerLng: 77.6250, defaultZoom: 12.1,
+    title: "App-Cab & Namma Yatri Revolution (2010–2025)",
+    goalText: "Open 6 Bengaluru hubs, complete 45 hauls, reach ₹6,08,000 Net Worth",
+    targetStations: 6, targetRides: 45, targetWorth: 38000,
+    driverPool: ["Ramesh Gowda", "Manjunath K.", "Suresh Babu", "Prakash Shetty", "Imran Pasha", "Kiran Kumar", "Venkatesh R.", "Naveen Raj"],
+    districts: [
+      { name: "MG Road & Brigade Rd", landmark: "Central CBD Metro", specialty: "Retail & Exec PAX", lat: 12.9756, lng: 77.6066, color: "#ffcb52", open: true },
+      { name: "Koramangala 80ft Rd", landmark: "Startup Hub", specialty: "Founder & Tech PAX", lat: 12.9352, lng: 77.6245, color: "#00f2fe", open: true },
+      { name: "Indiranagar 100ft Rd", landmark: "East Commercial Core", specialty: "Dining & Commuters", lat: 12.9784, lng: 77.6408, color: "#38f9d7", open: true },
+      { name: "Majestic KSR Station", landmark: "City Railway & Bus Hub", specialty: "Intercity PAX & Parcels", lat: 12.9767, lng: 77.5713, color: "#ff7e6b", open: false },
+      { name: "Whitefield ITPL", landmark: "East IT Corridor", specialty: "IT Campus Shuttles", lat: 12.9850, lng: 77.7369, color: "#a97aff", open: false },
+      { name: "Electronic City Ph-1", landmark: "Hosur Rd Elevated Tech", specialty: "Software Park Express", lat: 12.8452, lng: 77.6602, color: "#ff4ecd", open: false },
+      { name: "Hebbal Outer Ring", landmark: "North Flyover Junction", specialty: "Airport Highway Link", lat: 13.0358, lng: 77.5970, color: "#5ce6d8", open: false },
+      { name: "Kempegowda Airport (BLR)", landmark: "Devanahalli T1/T2", specialty: "Long-Haul Airport Fares", lat: 13.1986, lng: 77.7066, color: "#ffd166", open: false }
+    ],
+    corridorGraph: [[0,1],[0,2],[0,3],[0,6],[1,2],[1,5],[2,4],[3,6],[4,2],[6,7]],
+    vehicles: [
+      { id: 0, year: 2010, name: "Bajaj RE Compact Auto-Cab", cost: 2800, cap: 2, speed: 0.90, kmh: 32, rel: 0.82, tip: 4, desc: "2010 Metered green-and-yellow city auto (₹30 base + ₹15/km)" },
+      { id: 1, year: 2011, name: "Tata Indica Vista App-Cab", cost: 5200, cap: 3, speed: 1.05, kmh: 38, rel: 0.86, tip: 10, desc: "2011 Smartphone aggregator AC hatchback (₹50 base + ₹18/km)" },
+      { id: 2, year: 2013, name: "Toyota Etios Prime Sedan", cost: 8200, cap: 4, speed: 1.18, kmh: 44, rel: 0.91, tip: 18, desc: "2013 Airport & IT corridor executive sedan (₹75 base + ₹21/km)" },
+      { id: 3, year: 2015, name: "Force Tempo IT Shuttle", cost: 11800, cap: 5, speed: 1.28, kmh: 48, rel: 0.93, tip: 26, desc: "2015 Whitefield–Electronic City corporate group shuttle" },
+      { id: 4, year: 2022, name: "Namma Yatri Tigor EV", cost: 15500, cap: 5, speed: 1.42, kmh: 54, rel: 0.96, tip: 36, desc: "2022 ONDC Zero-Commission subscription electric cab" },
+      { id: 5, year: 2024, name: "BLR Expressway Robo-Pod", cost: 21000, cap: 6, speed: 1.60, kmh: 65, rel: 0.99, tip: 50, desc: "2024 Autonomous Devanahalli airport express liner" }
+    ],
+    chronicle: [
+      { year: 2010, text: "2010 Bengaluru: Radio call-cabs (Meru/EasyCabs) dominate Kempegowda Airport & MG Road." },
+      { year: 2011, text: "2011 Bengaluru: Smartphone cab aggregators launch in Koramangala & Indiranagar!" },
+      { year: 2013, text: "2013 Bengaluru: Global ride-hailing giant enters Bengaluru in August/October—fare wars erupt!" },
+      { year: 2015, text: "2015 Bengaluru: ₹1,200 Cr TaxiForSure buyout + bike-taxis & IT carpooling reshape Whitefield!" },
+      { year: 2020, text: "2020 Lockdown Shock: Work-from-home empties IT corridors; rival valuations plunge 52%." },
+      { year: 2022, text: "2022 Bengaluru: Namma Yatri open-network (ONDC) zero-commission ₹25/day driver subscription launches!" }
+    ],
+    rivals: [
+      { name: "Deccan Cab Co.", price: 55, fleet: 3, district: 3, color: "#ff7e6b" },
+      { name: "SilkBoard Express", price: 70, fleet: 4, district: 4, color: "#00f2fe" },
+      { name: "Nandi Fleet Ventures", price: 45, fleet: 2, district: 5, color: "#a97aff" }
+    ]
+  },
+  {
+    id: 1, flag: "🇺🇸", city: "New York City", country: "United States",
+    currencySymbol: "$", currencyCode: "USD", locale: "en-US", fx: 1,
+    baseFare: 3.0, perKmRate: 2.20, tariffDesc: "NYC TLC Metered Tariff: $3.00 Flag-Drop + $2.20/km ($3.50/mi) + $2.50 MTA Congestion",
+    startYear: 2007, endYear: 2025,
+    centerLat: 40.7350, centerLng: -73.9550, defaultZoom: 11.8,
+    title: "Yellow Medallions, Boro Cabs & TLC Era (2007–2025)",
+    goalText: "Connect Manhattan, Brooklyn & Queens: 6 stations, 55 hauls, $50,000 Net Worth",
+    targetStations: 6, targetRides: 55, targetWorth: 50000,
+    driverPool: ["Marco Rossi", "Tariq Mahmood", "Jean-Baptiste L.", "Carlos Mendez", "Dmitri Volkov", "Kwame Mensah", "Frank Castellano", "Darnell Brooks"],
+    districts: [
+      { name: "Times Square / Midtown", landmark: "42nd St & Broadway", specialty: "Theater & Tourist Surge", lat: 40.7580, lng: -73.9855, color: "#ffcb52", open: true },
+      { name: "Wall Street / FiDi", landmark: "Lower Manhattan NYSE", specialty: "Investment Bank VIPs", lat: 40.7074, lng: -74.0113, color: "#00f2fe", open: true },
+      { name: "Grand Central Terminal", landmark: "Park Ave & 42nd St", specialty: "Metro-North Commuters", lat: 40.7527, lng: -73.9772, color: "#38f9d7", open: true },
+      { name: "Williamsburg, Brooklyn", landmark: "Bedford Ave L-Train", specialty: "East River Creative PAX", lat: 40.7181, lng: -73.9571, color: "#ff7e6b", open: false },
+      { name: "Downtown Brooklyn", landmark: "Atlantic Terminal Hub", specialty: "Borough Commuters", lat: 40.6836, lng: -73.9766, color: "#a97aff", open: false },
+      { name: "Long Island City, Queens", landmark: "Queensboro Bridge", specialty: "Midtown Tunnel Express", lat: 40.7447, lng: -73.9485, color: "#ff4ecd", open: false },
+      { name: "Harlem 125th Street", landmark: "Upper Manhattan Core", specialty: "Uptown Boro-Cab Zone", lat: 40.8075, lng: -73.9454, color: "#5ce6d8", open: false },
+      { name: "JFK Int'l Airport (Queens)", landmark: "Jamaica Bay Terminals", specialty: "Transatlantic Air Fares ($70 Flat)", lat: 40.6413, lng: -73.7781, color: "#ffd166", open: false }
+    ],
+    corridorGraph: [[0,1],[0,2],[0,6],[1,4],[2,5],[2,3],[3,4],[3,5],[5,7],[4,7]],
+    vehicles: [
+      { id: 0, year: 2007, name: "Crown Vic Yellow Medallion", cost: 4200, cap: 2, speed: 0.95, kmh: 34, rel: 0.82, tip: 5, desc: "2007 Iconic V8 NYC Yellow Cab with TLC GPS screen" },
+      { id: 1, year: 2011, name: "Suburban Black-Car SUV", cost: 6800, cap: 3, speed: 1.08, kmh: 40, rel: 0.87, tip: 14, desc: "2011 Wall Street app-dispatched luxury FHV SUV" },
+      { id: 2, year: 2013, name: "Apple-Green Boro Hybrid", cost: 9500, cap: 4, speed: 1.20, kmh: 45, rel: 0.90, tip: 20, desc: "2013 Outer-borough street-hail Camry hybrid cab" },
+      { id: 3, year: 2016, name: "Via Shared Crosstown Van", cost: 13200, cap: 5, speed: 1.32, kmh: 50, rel: 0.93, tip: 28, desc: "2016 Dynamic pooled Manhattan express van" },
+      { id: 4, year: 2021, name: "Revel All-Electric Tesla Y", cost: 17800, cap: 5, speed: 1.46, kmh: 56, rel: 0.96, tip: 38, desc: "2021 Zero-emission NYC EV fleet crossover" },
+      { id: 5, year: 2024, name: "Congestion-Zone Robo-Pod", cost: 24000, cap: 6, speed: 1.62, kmh: 64, rel: 0.99, tip: 52, desc: "2024 High-capacity autonomous Manhattan shuttle" }
+    ],
+    chronicle: [
+      { year: 2007, text: "2007 NYC: TLC mandates GPS & credit-card touchscreens across all 13,000 Yellow Medallion cabs." },
+      { year: 2011, text: "2011 NYC: Smartphone e-hailing launches in Manhattan; medallion prices soar past $1,000,000!" },
+      { year: 2013, text: "2013 NYC: Apple-Green Boro Taxis launch to serve Brooklyn, Queens, Bronx & Harlem!" },
+      { year: 2015, text: "2015 NYC: App-based FHV vehicles surpass Yellow Cabs for the first time; medallion bubble bursts." },
+      { year: 2018, text: "2018 NYC: TLC enacts historic FHV vehicle cap & minimum per-minute/per-mile driver pay." },
+      { year: 2024, text: "2024 NYC: Manhattan Congestion Relief Zone & zero-emission EV fleet transition!" }
+    ],
+    rivals: [
+      { name: "Gotham Medallion Corp", price: 62, fleet: 3, district: 3, color: "#ff7e6b" },
+      { name: "Hudson Black-Car Inc", price: 78, fleet: 4, district: 4, color: "#00f2fe" },
+      { name: "Five-Boro Express", price: 48, fleet: 3, district: 5, color: "#a97aff" }
+    ]
+  },
+  {
+    id: 2, flag: "🇬🇧", city: "London", country: "United Kingdom",
+    currencySymbol: "£", currencyCode: "GBP", locale: "en-GB", fx: 0.85,
+    baseFare: 3.80, perKmRate: 2.40, tariffDesc: "TfL Black Cab & PHV Tariff: £3.80 Flag-Fall + £2.40/km + ULEZ Compliance",
+    startYear: 2012, endYear: 2025,
+    centerLat: 51.5080, centerLng: -0.1150, defaultZoom: 12.0,
+    title: "Black Cabs, The Knowledge & ULEZ Electric Era (2012–2025)",
+    goalText: "Bridge the Thames & Heathrow: 6 stations, 50 hauls, £40,800 Net Worth",
+    targetStations: 6, targetRides: 50, targetWorth: 48000,
+    driverPool: ["Alfie Turner", "Dave Jenkins", "Tariq Hussain", "Callum Reid", "Winston Clarke", "Gavin Barnes", "Mo Siddiqui", "Harry Collins"],
+    districts: [
+      { name: "Westminster & Victoria", landmark: "Parliament & Whitehall", specialty: "Gov & West End PAX", lat: 51.4995, lng: -0.1248, color: "#ffcb52", open: true },
+      { name: "City of London (Bank)", landmark: "Square Mile Finance", specialty: "Executive Financial Fares", lat: 51.5133, lng: -0.0889, color: "#00f2fe", open: true },
+      { name: "Waterloo & South Bank", landmark: "Thames South Terminus", specialty: "Cross-River Commuters", lat: 51.5031, lng: -0.1132, color: "#38f9d7", open: true },
+      { name: "King's Cross St Pancras", landmark: "Eurostar North Hub", specialty: "Continental Rail PAX", lat: 51.5308, lng: -0.1238, color: "#ff7e6b", open: false },
+      { name: "Shoreditch & Old Street", landmark: "Silicon Roundabout", specialty: "Tech & Nightlife Surge", lat: 51.5245, lng: -0.0789, color: "#a97aff", open: false },
+      { name: "Canary Wharf Docklands", landmark: "Isle of Dogs Towers", specialty: "Banking Express Line", lat: 51.5054, lng: -0.0235, color: "#ff4ecd", open: false },
+      { name: "Paddington & Kensington", landmark: "West End Gateway", specialty: "Heathrow Express Link", lat: 51.5154, lng: -0.1755, color: "#5ce6d8", open: false },
+      { name: "Heathrow Airport (LHR)", landmark: "M4 West London Hub", specialty: "Global Air Transfers", lat: 51.4700, lng: -0.4543, color: "#ffd166", open: false }
+    ],
+    corridorGraph: [[0,1],[0,2],[0,3],[0,6],[1,2],[1,4],[1,5],[3,4],[6,7]],
+    vehicles: [
+      { id: 0, year: 2012, name: "TX4 Hackney Black Cab", cost: 4200, cap: 2, speed: 0.95, kmh: 33, rel: 0.84, tip: 6, desc: "2012 Classic London Black Cab ('The Knowledge')" },
+      { id: 1, year: 2013, name: "Prius TfL Private-Hire", cost: 6600, cap: 3, speed: 1.08, kmh: 39, rel: 0.88, tip: 12, desc: "2013 TfL app-booked hybrid minicab" },
+      { id: 2, year: 2016, name: "Canary Wharf Exec E-Class", cost: 9600, cap: 4, speed: 1.22, kmh: 45, rel: 0.91, tip: 22, desc: "2016 Square Mile corporate chauffeur class" },
+      { id: 3, year: 2018, name: "LEVC TX Electric Black Cab", cost: 13600, cap: 5, speed: 1.35, kmh: 50, rel: 0.94, tip: 30, desc: "2018 Zero-emission purpose-built London cab" },
+      { id: 4, year: 2022, name: "ULEZ Zero-Emission e-Vito", cost: 18000, cap: 5, speed: 1.48, kmh: 56, rel: 0.97, tip: 40, desc: "2022 6-passenger electric London shuttle" },
+      { id: 5, year: 2025, name: "Thames Autonomous Pod", cost: 24500, cap: 6, speed: 1.64, kmh: 65, rel: 0.99, tip: 54, desc: "2025 Autonomous Docklands–Heathrow liner" }
+    ],
+    chronicle: [
+      { year: 2012, text: "2012 London Olympics: Hailo & Uber launch in London alongside iconic Hackney Black Cabs." },
+      { year: 2015, text: "2015 London: Black Cab drivers stage Parliament protests; TfL tightens private-hire rules." },
+      { year: 2018, text: "2018 London: LEVC TX electric range-extended Black Cabs roll out across Westminster & Bank!" },
+      { year: 2020, text: "2020 Lockdown Shock: Central London footfall drops; rival stock valuations fall 52%." },
+      { year: 2021, text: "2021 UK Supreme Court Ruling: App drivers classified as 'workers' with pension & pay protections." },
+      { year: 2023, text: "2023 London: Ultra Low Emission Zone (ULEZ) expands across all London boroughs!" }
+    ],
+    rivals: [
+      { name: "Thames Carriage PLC", price: 60, fleet: 3, district: 3, color: "#ff7e6b" },
+      { name: "Docklands Chauffeur", price: 75, fleet: 4, district: 5, color: "#00f2fe" },
+      { name: "Albion Minicabs", price: 50, fleet: 2, district: 4, color: "#a97aff" }
+    ]
+  },
+  {
+    id: 3, flag: "🇺🇸", city: "San Francisco", country: "United States",
+    currencySymbol: "$", currencyCode: "USD", locale: "en-US", fx: 1,
+    baseFare: 3.50, perKmRate: 2.35, tariffDesc: "CPUC TNC & Robotaxi Tariff: $3.50 Base + $2.35/km + SF City Fee",
+    startYear: 2009, endYear: 2025,
+    centerLat: 37.7749, centerLng: -122.4194, defaultZoom: 12.2,
+    title: "Birthplace of Ridesharing & Robotaxis (2009–2025)",
+    goalText: "Connect SF Peninsula & Bay: 6 stations, 55 hauls, $55,000 Net Worth",
+    targetStations: 6, targetRides: 55, targetWorth: 55000,
+    driverPool: ["Kevin Chen", "Mateo Silva", "Devin Patel", "Sarah Jenkins", "Alexei Morozov", "Jordan Rivera", "Aiden Wong", "Elena Rostova"],
+    districts: [
+      { name: "Market St & Embarcadero", landmark: "Ferry Building & FiDi", specialty: "VC & Financial PAX", lat: 37.7936, lng: -122.3958, color: "#ffcb52", open: true },
+      { name: "SoMa & Caltrain Depot", landmark: "4th & King Tech Hub", specialty: "Startup Founder Commute", lat: 37.7764, lng: -122.3948, color: "#00f2fe", open: true },
+      { name: "Union Square & Nob Hill", landmark: "Powell Cable Car Turn", specialty: "Hotel & Retail Surge", lat: 37.7879, lng: -122.4075, color: "#38f9d7", open: true },
+      { name: "Mission District 16th St", landmark: "Valencia Corridor", specialty: "Commuter & Nightlife", lat: 37.7648, lng: -122.4199, color: "#ff7e6b", open: false },
+      { name: "Fisherman's Wharf Pier 39", landmark: "North Waterfront", specialty: "Tourism & Bay PAX", lat: 37.8087, lng: -122.4098, color: "#a97aff", open: false },
+      { name: "Castro & Market", landmark: "Twin Peaks Portal", specialty: "Residential Neighborhood", lat: 37.7609, lng: -122.4350, color: "#ff4ecd", open: false },
+      { name: "Oakland Bay Terminal", landmark: "East Bay Bridge Span", specialty: "Transbay Commuters", lat: 37.8044, lng: -122.2712, color: "#5ce6d8", open: false },
+      { name: "SFO Int'l Airport", landmark: "US-101 Bayshore Hub", specialty: "Silicon Valley Air Fares", lat: 37.6213, lng: -122.3790, color: "#ffd166", open: false }
+    ],
+    corridorGraph: [[0,1],[0,2],[0,4],[0,6],[1,3],[1,7],[2,3],[2,4],[3,5],[3,7]],
+    vehicles: [
+      { id: 0, year: 2009, name: "Town Car Black-Cab", cost: 4000, cap: 2, speed: 0.95, kmh: 35, rel: 0.82, tip: 6, desc: "2009 Original SF black-car smartphone dispatch" },
+      { id: 1, year: 2012, name: "Pink-Mustache P2P Prius", cost: 6400, cap: 3, speed: 1.08, kmh: 40, rel: 0.87, tip: 12, desc: "2012 Peer-to-peer TNC rideshare hatchback" },
+      { id: 2, year: 2014, name: "SoMa Carpool Express SUV", cost: 9200, cap: 4, speed: 1.22, kmh: 46, rel: 0.91, tip: 20, desc: "2014 Multi-stop pooled commuter vehicle" },
+      { id: 3, year: 2018, name: "Silicon Valley EV Model 3", cost: 13200, cap: 4, speed: 1.36, kmh: 52, rel: 0.95, tip: 30, desc: "2018 Fast-charge electric executive sedan" },
+      { id: 4, year: 2022, name: "Waymo LiDAR Jaguar I-Pace", cost: 18000, cap: 5, speed: 1.50, kmh: 58, rel: 0.98, tip: 42, desc: "2022 Driverless SF commercial robotaxi" },
+      { id: 5, year: 2024, name: "Bay Area Robo-Shuttle Pod", cost: 24500, cap: 6, speed: 1.65, kmh: 66, rel: 0.99, tip: 56, desc: "2024 Steering-wheel-free autonomous fleet pod" }
+    ],
+    chronicle: [
+      { year: 2009, text: "2009 San Francisco: UberCab is founded in SoMa as an on-demand luxury black-car service." },
+      { year: 2012, text: "2012 San Francisco: Peer-to-peer ridesharing (Lyft & UberX) launches; CPUC creates TNC category!" },
+      { year: 2014, text: "2014 San Francisco: Algorithmically matched carpooling (UberPool / Lyft Line) debuts on Market St." },
+      { year: 2020, text: "2020 California Prop 22: Voters approve gig-driver ballot measure amid pandemic travel shock." },
+      { year: 2023, text: "2023 San Francisco: 24/7 commercial driverless Robotaxis (Waymo) approved across all of SF!" }
+    ],
+    rivals: [
+      { name: "Bayshore Cab Co.", price: 58, fleet: 3, district: 3, color: "#ff7e6b" },
+      { name: "Embarcadero Mobility", price: 74, fleet: 4, district: 4, color: "#00f2fe" },
+      { name: "Pacific Robotaxi Inc", price: 52, fleet: 3, district: 5, color: "#a97aff" }
+    ]
+  },
+  {
+    id: 4, flag: "🇯🇵", city: "Tokyo", country: "Japan",
+    currencySymbol: "¥", currencyCode: "JPY", locale: "ja-JP", fx: 145,
+    baseFare: 500, perKmRate: 320, tariffDesc: "MLIT Tokyo Tariff: ¥500 Base (1.096 km) + ¥320/km (¥100/255m)",
+    startYear: 2011, endYear: 2025,
+    centerLat: 35.6620, centerLng: 139.7450, defaultZoom: 11.9,
+    title: "Crown Comforts, JPN Taxi & GO App Era (2011–2025)",
+    goalText: "Master the Yamanote & Bay Loop: 6 stations, 60 hauls, ¥8,700,000 Net Worth",
+    targetStations: 6, targetRides: 60, targetWorth: 60000,
+    driverPool: ["Kenji Takahashi", "Hiroshi Sato", "Takumi Watanabe", "Daisuke Ito", "Shinji Nakamura", "Yuki Kobayashi", "Kazuo Yamamoto", "Ren Saito"],
+    districts: [
+      { name: "Tokyo Station Marunouchi", landmark: "Imperial Palace & Shinkansen", specialty: "Executive & Bullet Rail PAX", lat: 35.6812, lng: 139.7671, color: "#ffcb52", open: true },
+      { name: "Shinjuku West Exit", landmark: "Metropolitan Gov Towers", specialty: "World's Busiest Hub PAX", lat: 35.6896, lng: 139.7006, color: "#00f2fe", open: true },
+      { name: "Shibuya Scramble", landmark: "Hachiko Square Hub", specialty: "Tech & Commercial Surge", lat: 35.6595, lng: 139.7004, color: "#38f9d7", open: true },
+      { name: "Roppongi Hills", landmark: "Minato Nightlife & Embassies", specialty: "Late-Night Premium Fares", lat: 35.6604, lng: 139.7292, color: "#ff7e6b", open: false },
+      { name: "Akihabara Electric Town", landmark: "Chiyoda Electronics Hub", specialty: "Precision Tech Parcels", lat: 35.6984, lng: 139.7731, color: "#a97aff", open: false },
+      { name: "Shinagawa Terminal", landmark: "Linear Chuo Shinkansen", specialty: "Corporate Express", lat: 35.6284, lng: 139.7387, color: "#ff4ecd", open: false },
+      { name: "Odaiba Rainbow Bay", landmark: "Tokyo Waterfront Island", specialty: "Expo & Bay Crossings", lat: 35.6250, lng: 139.7755, color: "#5ce6d8", open: false },
+      { name: "Haneda Airport (HND)", landmark: "Ota Tokyo Bay Skyport", specialty: "Domestic & Int'l Air VIP", lat: 35.5494, lng: 139.7798, color: "#ffd166", open: false }
+    ],
+    corridorGraph: [[0,1],[0,3],[0,4],[0,5],[1,2],[2,3],[3,5],[5,6],[5,7],[6,7]],
+    vehicles: [
+      { id: 0, year: 2011, name: "Toyota Crown Comfort", cost: 4100, cap: 2, speed: 0.95, kmh: 36, rel: 0.88, tip: 6, desc: "2011 White-gloved automatic-door Tokyo classic" },
+      { id: 1, year: 2014, name: "Nihon Kotsu Black Crown", cost: 6500, cap: 3, speed: 1.08, kmh: 42, rel: 0.91, tip: 14, desc: "2014 Marunouchi executive hire sedan" },
+      { id: 2, year: 2017, name: "Toyota JPN Taxi LPG-Hybrid", cost: 9400, cap: 4, speed: 1.22, kmh: 48, rel: 0.94, tip: 22, desc: "2017 Deep-indigo universal-design Olympic cab" },
+      { id: 3, year: 2020, name: "GO-App Alphard VIP Van", cost: 13200, cap: 5, speed: 1.36, kmh: 54, rel: 0.96, tip: 32, desc: "2020 Luxury Haneda–Roppongi executive liner" },
+      { id: 4, year: 2023, name: "Odaiba e-Palette EV Shuttle", cost: 17800, cap: 5, speed: 1.50, kmh: 60, rel: 0.98, tip: 44, desc: "2023 Autonomous Tokyo Bay electric pod" },
+      { id: 5, year: 2025, name: "Chuo Maglev Feeder Liner", cost: 24000, cap: 6, speed: 1.66, kmh: 68, rel: 0.99, tip: 58, desc: "2025 Ultra-speed Shinagawa–Haneda consist" }
+    ],
+    chronicle: [
+      { year: 2011, text: "2011 Tokyo: Nihon Kotsu launches Japan's first smartphone taxi app alongside Crown Comfort fleets." },
+      { year: 2017, text: "2017 Tokyo: Toyota debuts the deep-indigo LPG-hybrid JPN Taxi ahead of the Tokyo Olympics!" },
+      { year: 2019, text: "2019 Tokyo: S.RIDE & rear-seat QR payment tablets modernize 45,000 Tokyo taxis." },
+      { year: 2020, text: "2020 Tokyo: JapanTaxi & MOV merge into the unified GO App; pandemic hits late-night Roppongi demand." },
+      { year: 2024, text: "2024 Tokyo: Japan launches regulated 'Nihon-ban Rideshare' to solve peak driver shortages!" }
+    ],
+    rivals: [
+      { name: "Edokko Kotsu Co.", price: 65, fleet: 4, district: 3, color: "#ff7e6b" },
+      { name: "Kanto Hinomaru Line", price: 80, fleet: 4, district: 4, color: "#00f2fe" },
+      { name: "Sakura Bay Mobility", price: 52, fleet: 3, district: 5, color: "#a97aff" }
+    ]
+  },
+  {
+    id: 5, flag: "🇸🇬", city: "Singapore", country: "Singapore",
+    currencySymbol: "S$", currencyCode: "SGD", locale: "en-SG", fx: 1.15,
+    baseFare: 4.30, perKmRate: 0.85, tariffDesc: "LTA Street-Hail & P2P Tariff: S$4.30 Flag-Down + S$0.85/km + S$3.00 ERP/CBD Peak",
+    startYear: 2013, endYear: 2025,
+    centerLat: 1.3200, centerLng: 103.8450, defaultZoom: 11.9,
+    title: "Super-Apps, COE Quotas & Autonomous Grid (2013–2025)",
+    goalText: "Connect Marina Bay, Changi & Jurong: 6 stations, 60 hauls, S$66,700 Net Worth",
+    targetStations: 6, targetRides: 60, targetWorth: 58000,
+    driverPool: ["Tan Wei Ming", "Ahmad Zulkifli", "Lim Boon Huat", "S. Muthukrishnan", "Kelvin Teo", "Farhan Rahman", "Desmond Ong", "Rajesh Nair"],
+    districts: [
+      { name: "Marina Bay Sands & CBD", landmark: "Raffles Place Waterfront", specialty: "Global Finance & VIP", lat: 1.2834, lng: 103.8607, color: "#ffcb52", open: true },
+      { name: "Orchard Road Central", landmark: "ION & Somerset Belt", specialty: "Retail & Hotel Surge", lat: 1.3048, lng: 103.8318, color: "#00f2fe", open: true },
+      { name: "Bugis & Rochor Hub", landmark: "Downtown Cultural Core", specialty: "High-Density Commuters", lat: 1.3006, lng: 103.8559, color: "#38f9d7", open: true },
+      { name: "One-North Biopolis", landmark: "Autonomous Testbed Zone", specialty: "R&D & Tech Freight", lat: 1.2996, lng: 103.7873, color: "#ff7e6b", open: false },
+      { name: "HarbourFront & Sentosa", landmark: "Southern Waterfront Gateway", specialty: "Resort & Cruise PAX", lat: 1.2653, lng: 103.8215, color: "#a97aff", open: false },
+      { name: "Jurong East Regional Hub", landmark: "West Industrial & High-Speed", specialty: "Port & Industrial Cargo", lat: 1.3329, lng: 103.7436, color: "#ff4ecd", open: false },
+      { name: "Woodlands Causeway", landmark: "Northern Strait Crossing", specialty: "Cross-Border Commuters", lat: 1.4360, lng: 103.7861, color: "#5ce6d8", open: false },
+      { name: "Changi Airport Jewel (SIN)", landmark: "East Coast Aviation Hub", specialty: "International Air Express", lat: 1.3644, lng: 103.9915, color: "#ffd166", open: false }
+    ],
+    corridorGraph: [[0,1],[0,2],[0,4],[1,2],[1,3],[2,7],[3,4],[3,5],[5,6],[1,6]],
+    vehicles: [
+      { id: 0, year: 2013, name: "Blue Sonata Comfort Cab", cost: 4000, cap: 2, speed: 0.95, kmh: 36, rel: 0.85, tip: 6, desc: "2013 Classic Singapore street-hail diesel cab (COE included)" },
+      { id: 1, year: 2014, name: "Super-App Private Vios", cost: 6400, cap: 3, speed: 1.08, kmh: 42, rel: 0.89, tip: 14, desc: "2014 Private-hire PDVL car with dynamic surge" },
+      { id: 2, year: 2016, name: "One-North nuTonomy EV", cost: 9200, cap: 4, speed: 1.22, kmh: 48, rel: 0.92, tip: 24, desc: "2016 World's first public autonomous trial EV" },
+      { id: 3, year: 2019, name: "Ioniq Hybrid Fleet Sedan", cost: 13000, cap: 5, speed: 1.36, kmh: 54, rel: 0.95, tip: 32, desc: "2019 Low-emission Singapore P2P fleet hybrid" },
+      { id: 4, year: 2022, name: "BYD e6 Changi Express EV", cost: 17500, cap: 5, speed: 1.50, kmh: 60, rel: 0.98, tip: 44, desc: "2022 High-range electric airport shuttle" },
+      { id: 5, year: 2025, name: "Sentosa–Marina Robo-Liner", cost: 23800, cap: 6, speed: 1.66, kmh: 68, rel: 0.99, tip: 56, desc: "2025 Autonomous island-wide smart transit pod" }
+    ],
+    chronicle: [
+      { year: 2013, text: "2013 Singapore: GrabTaxi & Uber enter Singapore, challenging ComfortDelGro's street-hail fleet." },
+      { year: 2016, text: "2016 Singapore: World's first public autonomous taxi trial (nuTonomy) launches at One-North!" },
+      { year: 2018, text: "2018 Singapore: Grab acquires Uber SEA; Gojek enters Singapore to compete across Marina Bay & Orchard." },
+      { year: 2020, text: "2020 Singapore: LTA Point-to-Point (P2P) regulatory framework & pandemic circuit-breaker shock." },
+      { year: 2025, text: "2025 Singapore: Cleaner-energy EV taxi mandate & autonomous shuttle corridors!" }
+    ],
+    rivals: [
+      { name: "Merlion Comfort PLC", price: 64, fleet: 3, district: 3, color: "#ff7e6b" },
+      { name: "Strait SuperApp Co.", price: 76, fleet: 4, district: 4, color: "#00f2fe" },
+      { name: "Lion City Autonomous", price: 50, fleet: 3, district: 5, color: "#a97aff" }
+    ]
+  }
+];
+
+const MANAGER_CATALOG = [
+  { id: 0, icon: "🔧", role: "Fleet Maintenance Chief", name: "Chief Vikram / Marcus", baseCost: 2200, desc: "Auto-services vehicles below 65% mechanical condition & cuts repair costs by 25%." },
+  { id: 1, icon: "🧼", role: "Hygiene & Valet Supervisor", name: "Supervisor Anita / Claire", baseCost: 1800, desc: "Automatically washes & sanitizes cabin interiors during turnaround so Cleanliness stays 90%+." },
+  { id: 2, icon: "🎓", role: "Driver HR & Training VP", name: "Director Priya / Kenji", baseCost: 2500, desc: "Recruits 4.8★+ pro drivers, cuts driver fatigue buildup by 35%, and boosts driver morale." },
+  { id: 3, icon: "🤖", role: "AI Dispatch & Surge Director", name: "Dr. Aravind / Lin", baseCost: 3200, desc: "Optimizes nearest-vehicle corridor routing & boosts shift fare yield by +15%." },
+  { id: 4, icon: "🌟", role: "Customer Relations & PR VP", name: "VP Meera / Elena", baseCost: 2800, desc: "Turns happy riders into 5★ reviews, mitigates bad reviews & attracts VIP corporate accounts." }
+];
+
+prepareHistoricalCampaigns();
+let state;
+let floaterTexts = [];
+let selectedHub = -1;
+
+/*
+ * WEB MERCATOR (LAT/LNG <-> SCREEN PIXELS) & REAL MAP TILE ENGINE
+ */
+let mapCam = { lat: 12.9780, lng: 77.6250, zoom: 12.1 };
+
+function lng2tileX(lng, z) { return ((lng + 180) / 360) * Math.pow(2, z); }
+function lat2tileY(lat, z) {
+  const rad = (lat * Math.PI) / 180;
+  return ((1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2) * Math.pow(2, z);
+}
+function tileX2lng(x, z) { return (x / Math.pow(2, z)) * 360 - 180; }
+function tileY2lat(y, z) {
+  const n = Math.PI - (2 * Math.PI * y) / Math.pow(2, z);
+  return (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+}
+
+function latLngToScreen(lat, lng) {
+  const scale = 256 * Math.pow(2, mapCam.zoom);
+  const cx = lng2tileX(mapCam.lng, 0) * scale;
+  const cy = lat2tileY(mapCam.lat, 0) * scale;
+  const px = lng2tileX(lng, 0) * scale;
+  const py = lat2tileY(lat, 0) * scale;
+  return {
+    x: window.innerWidth * 0.5 + (px - cx),
+    y: window.innerHeight * 0.5 + (py - cy)
+  };
+}
+
+function screenToLatLng(sx, sy) {
+  const scale = 256 * Math.pow(2, mapCam.zoom);
+  const cx = lng2tileX(mapCam.lng, 0) * scale;
+  const cy = lat2tileY(mapCam.lat, 0) * scale;
+  const px = cx + (sx - window.innerWidth * 0.5);
+  const py = cy + (sy - window.innerHeight * 0.5);
+  return {
+    lng: tileX2lng(px / 256, mapCam.zoom),
+    lat: tileY2lat(py / 256, mapCam.zoom)
+  };
+}
+
+function currentScenario() {
+  return WORLD_SCENARIOS[state ? state.scenarioId || 0 : 0];
+}
+function money(n) {
+  const sc = currentScenario();
+  const localVal = Math.round(n * (sc.fx || 1));
+  return sc.currencySymbol + localVal.toLocaleString(sc.locale || 'en-US');
+}
+function exactLocalMoney(localAmount) {
+  const sc = currentScenario();
+  const rounded = sc.fx >= 10 ? Math.round(localAmount) : Number(localAmount.toFixed(2));
+  return sc.currencySymbol + rounded.toLocaleString(sc.locale || 'en-US');
+}
+
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Find shortest station-to-station hop sequence on the city's corridor graph
+function findStationPath(fromIdx, toIdx) {
+  if (fromIdx === toIdx) return [fromIdx];
+  const n = state.districts.length;
+  const adj = Array.from({ length: n }, () => []);
+  for (const [u, v] of currentScenario().corridorGraph) {
+    if (u < n && v < n) { adj[u].push(v); adj[v].push(u); }
+  }
+  const prev = new Array(n).fill(-1);
+  const visited = new Array(n).fill(false);
+  const q = [fromIdx];
+  visited[fromIdx] = true;
+  while (q.length > 0) {
+    const u = q.shift();
+    if (u === toIdx) break;
+    for (const v of adj[u]) {
+      if (!visited[v]) { visited[v] = true; prev[v] = u; q.push(v); }
+    }
+  }
+  if (!visited[toIdx]) return [fromIdx, toIdx];
+  const path = [];
+  for (let cur = toIdx; cur !== -1; cur = prev[cur]) path.push(cur);
+  path.reverse();
+  return path;
+}
+
+function edgeKey(a, b) { return Math.min(a, b) + "-" + Math.max(a, b); }
+
+function getEdgeTier(a, b) {
+  return (state.edgeTiers && state.edgeTiers[edgeKey(a, b)]) || 0;
+}
+
+function setEdgeTier(a, b, t) {
+  if (!state.edgeTiers) state.edgeTiers = {};
+  const k = edgeKey(a, b);
+  state.edgeTiers[k] = Math.max(state.edgeTiers[k] || 0, t);
+}
+
+let audioCtx = null;
+function playTone(freq, dur = 0.09, type = "sine") {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + dur);
+  } catch (e) {}
+}
+
+function createScenarioState(scenIdx = 0, diffIdx = (state && typeof state.difficulty === "number" ? state.difficulty : 2)) {
+  resetPress();
+  const sc = WORLD_SCENARIOS[scenIdx];
+  const df = DIFFICULTY_MODES[Math.max(0, Math.min(DIFFICULTY_MODES.length - 1, diffIdx))];
+  const s = {
+    scenarioId: scenIdx,
+    difficulty: df.id,
+    scenarioWon: false,
+    cash: Math.round(15000 * df.startCashMult), revenue: 0, expenses: 0, rides: 0, missed: 0, cargoTons: 0,
+    elapsed: 0, spawnClock: 0, costClock: 0, rating: 4.85, marketClock: 0, competitionClock: 0,
+    marginDebt: 0, dividends: 0, historyStage: 0, marginCalls: 0, marketTick: 0,
+    bonds: 0, restructurings: 0,
+    speed: 1, nextRide: 1, spawnSequence: 0,
+    autoDispatch: true, milestone: false,
+    businessModel: 0, grossFares: 0,
+    edgeTiers: { "0-1": 1, "0-2": 1, "1-2": 1 },
+    message: `${sc.flag} ${sc.city}: build your first reliable service. Historical editions arrive as the campaign calendar advances.`,
+    districts: sc.districts.map((d, idx) => ({
+      ...d,
+      level: 1,
+      facilities: 0,
+      supply: [idx < 3 ? 3 : 1, idx === 1 ? 2 : 1, idx === 0 ? 2 : 1, idx >= 6 ? 3 : 0],
+      demandMult: [120, 130, 145, 135]
+    })),
+    taxis: [],
+    drivers: [
+      { id: 1, name: (sc.driverPool && sc.driverPool[0]) || "Captain #1", skill: 4.82, level: 1, fatigue: 6, assignedTaxi: 1, trips: 0 }
+    ],
+    managers: MANAGER_CATALOG.map(m => ({ ...m, hired: false })),
+    reviews: [
+      { stars: 5, rider: "Verified Commuter", text: `Spotless ${sc.vehicles[0].name}, polite driver ${(sc.driverPool && sc.driverPool[0]) || "Captain"}, and accurate ${sc.city} meter rate!`, unit: 1 }
+    ],
+    requests: [],
+    companies: sc.rivals.map(r => ({
+      ...r,
+      owned: 0, cash: 6500, served: 0, merged: false,
+      priceHistory: [r.price - 2, r.price - 1, r.price],
+      fromStation: r.district,
+      toStation: (r.district + 1) % sc.districts.length,
+      progress: 0
+    }))
+  };
+  state = s;
+  s.taxis.push({
+    id: 1, station: 0, status: IDLE, at: 0, tier: 1, engineId: 0,
+    progress: 0, charge: 0, condition: 100, cleanliness: 100, comfort: 82, comfortLevel: 1,
+    broken: false, driverId: 1,
+    routeStops: [0, 1], waitPolicy: 0,
+    stationPath: [0, 1], ride: null
+  });
+  return s;
+}
+
+function year() {
+  const sc = currentScenario();
+  return Math.min(sc.endYear, sc.startYear + Math.floor(state.elapsed / 50));
+}
+function rushHour() { return (Math.floor(state.elapsed / 40) % 3) === 1; }
+function trafficFactor() { return rushHour() ? 0.72 : 1.0; }
+function openCount() { return state.districts.filter(d => d.open).length; }
+function totalHubLevels() { return state.districts.reduce((acc, d) => acc + (d.open ? d.level - 1 : 0), 0); }
+function corridorCount() { return Object.values(state.edgeTiers || {}).reduce((a, b) => a + b, 0); }
+function districtPrice(i) { return 3400 + i * 550; }
+function districtUpgradePrice(i) { return 2500 * state.districts[i].level + i * 300; }
+function portfolioValue() {
+  return state.companies.reduce((acc, c) => acc + (c.merged ? 0 : c.price * c.owned), 0);
+}
+function bondDebt() { return state.bonds * BOND_FACE; }
+function netWorth() {
+  return state.cash + portfolioValue() - state.marginDebt - bondDebt() +
+    state.taxis.length * 1800 + openCount() * 2400 + totalHubLevels() * 1900 + corridorCount() * 600;
+}
+function equityRatio() {
+  const v = portfolioValue();
+  return v === 0 ? 1 : (v - state.marginDebt) / v;
+}
+function demandFactor() {
+  const y = year();
+  const hist = y === 2020 ? 0.32 : y === 2021 ? 0.75 : y >= 2015 ? 1.2 : 1.0;
+  const mod = state.businessModel === 1 ? (rushHour() ? 1.55 : 0.78) : state.businessModel === 2 ? 1.28 : 1.0;
+  return hist * mod;
+}
+
+function corridorLinkMinTier(fromIdx, toIdx) {
+  const path = findStationPath(fromIdx, toIdx);
+  if (path.length < 2) return 3;
+  let min = 3;
+  for (let i = 1; i < path.length; i++) {
+    min = Math.min(min, getEdgeTier(path[i - 1], path[i]));
+  }
+  return min;
+}
+
+function corridorLinkCost(fromIdx, toIdx, targetTier) {
+  const path = findStationPath(fromIdx, toIdx);
+  if (path.length < 2) return 0;
+  let sum = 0;
+  for (let i = 1; i < path.length; i++) {
+    const u = path[i - 1], v = path[i];
+    const cur = getEdgeTier(u, v);
+    if (targetTier > cur) {
+      const d1 = state.districts[u], d2 = state.districts[v];
+      const km = Math.max(2, haversineKm(d1.lat, d1.lng, d2.lat, d2.lng));
+      sum += Math.round(km * 180 * (targetTier - cur));
+    }
+  }
+  return sum;
+}
+
+function buildCorridorLink(fromIdx, toIdx, targetTier) {
+  const cost = corridorLinkCost(fromIdx, toIdx, targetTier);
+  if (cost <= 0) {
+    state.message = "Corridor already upgraded to that tier!";
+    refreshUI(); return;
+  }
+  if (state.cash < cost) {
+    state.message = `Need ${money(cost)} to construct Tier ${targetTier} corridor.`;
+    refreshUI(); return;
+  }
+  state.cash -= cost;
+  state.expenses += cost;
+  const path = findStationPath(fromIdx, toIdx);
+  for (let i = 1; i < path.length; i++) {
+    setEdgeTier(path[i - 1], path[i], targetTier);
+  }
+  const tierNames = ["", "Dedicated Transit Lane (T1)", "Twin Express Corridor (T2)", "Autonomous Super-Corridor (T3)"];
+  state.message = `Built ${tierNames[targetTier]} linking ${state.districts[fromIdx].name} ↔ ${state.districts[toIdx].name}!`;
+  addFloater(toIdx, `CORRIDOR T${targetTier}!`, "#00f2fe");
+  playTone(700, 0.14);
+  saveState(); refreshUI(); renderHubPopover();
+}
+
+function facilityPrice(flag) {
+  if (flag === FAC_MAINT) return 1400;
+  if (flag === FAC_LOUNGE) return 1800;
+  if (flag === FAC_CARGO) return 1600;
+  return 2000;
+}
+function buildFacility(distIdx, flag) {
+  const d = state.districts[distIdx];
+  if (!d.open) { state.message = "Unlock this station first."; refreshUI(); return; }
+  if ((d.facilities & flag) !== 0) return;
+  const cost = facilityPrice(flag);
+  if (state.cash < cost) { state.message = `Need ${money(cost)} for this station facility.`; refreshUI(); return; }
+  state.cash -= cost; state.expenses += cost;
+  d.facilities |= flag;
+  const fname = flag === FAC_MAINT ? "Maintenance Depot" : flag === FAC_LOUNGE ? "VIP Executive Lounge" : flag === FAC_CARGO ? "Express Parcel Hub" : "Supercharger Array";
+  state.message = `Installed ${fname} at ${d.name}!`;
+  addFloater(distIdx, `+${fname.toUpperCase()}`, "#ffcb52");
+  playTone(790, 0.13);
+  saveState(); refreshUI(); renderHubPopover();
+}
+
+function inferKind(from, to) {
+  if (from >= 6 || to >= 6) return 3; // Airport / Regional Long-Haul
+  if (from === 0 || to === 0 || from === 1) return 2; // Executive / Tech VIP
+  if ((from + to) % 2 === 1) return 1; // Express Parcel
+  return 0; // Commuter PAX
+}
+
+function hasManager(id) {
+  return state.managers && state.managers[id] && state.managers[id].hired;
+}
+
+function getDriverForTaxi(t) {
+  if (!state.drivers || state.drivers.length === 0) return { name: "Auto-Pilot", skill: 4.8, fatigue: 0, level: 1 };
+  return state.drivers.find(d => d.assignedTaxi === t.id) || state.drivers[0];
+}
+
+function createRide(from, to) {
+  if (from === to || !state.districts[from].open || !state.districts[to].open || state.requests.length >= 7) return;
+  const sc = currentScenario();
+  const orig = state.districts[from], dest = state.districts[to];
+  const km = Math.max(1.8, haversineKm(orig.lat, orig.lng, dest.lat, dest.lng));
+  const kind = inferKind(from, to);
+  const hubBonus = 1 + (orig.level - 1) * 0.14 + (dest.level - 1) * 0.10;
+  const facBonus = ((orig.facilities & FAC_LOUNGE) && kind !== 1 ? 0.24 : 0) + ((orig.facilities & FAC_CARGO) && (kind === 1 || kind === 3) ? 0.24 : 0);
+  const demBonus = (dest.demandMult ? dest.demandMult[kind] : 120) / 120;
+  const kindMult = kind === 3 ? 1.30 : kind === 2 ? 1.18 : 1.0;
+  const surgeMult = rushHour() ? 1.25 : 1.0;
+  // Authentic standard city metered single-ride fare in local currency:
+  const meterLocal = (sc.baseFare + km * sc.perKmRate) * surgeMult * kindMult;
+  // Fleet shift block credit (10-trip block) normalized to internal units:
+  const fare = Math.round((95 + km * 28) * surgeMult * (hubBonus + facBonus) * kindMult * demBonus);
+  if (orig.supply) orig.supply[kind] = Math.min(12, (orig.supply[kind] || 0) + 1);
+  state.requests.push({ id: state.nextRide++, from, to, km: km.toFixed(1), meterLocal, fare, created: state.elapsed, kind });
+}
+
+function generateRide() {
+  const open = [];
+  state.districts.forEach((d, idx) => { if (d.open) open.push(idx); });
+  if (open.length < 2) return;
+  const seq = state.spawnSequence++;
+  const a = open[(seq * 7 + Math.floor(seq / 3)) % open.length];
+  const bi = (open.indexOf(a) + 1 + Math.floor(seq / open.length) % (open.length - 1)) % open.length;
+  createRide(a, open[bi]);
+}
+
+function addFloater(stationIdx, text, color) {
+  const d = state.districts[stationIdx] || state.districts[0];
+  floaterTexts.push({ lat: d.lat, lng: d.lng, text, color, life: 1.0 });
+}
+
+function getEngine(t) {
+  const list = currentScenario().vehicles;
+  return list[Math.max(0, Math.min(list.length - 1, t.engineId || 0))];
+}
+
+function getTaxiLatLng(t) {
+  const path = t.stationPath || [t.station || 0];
+  const aIdx = path[Math.min(t.at || 0, path.length - 1)];
+  const bIdx = path[Math.min((t.at || 0) + 1, path.length - 1)];
+  const da = state.districts[aIdx] || state.districts[0];
+  const db = state.districts[bIdx] || da;
+  return {
+    lat: da.lat + (db.lat - da.lat) * (t.progress || 0),
+    lng: da.lng + (db.lng - da.lng) * (t.progress || 0),
+    angle: Math.atan2(db.lat - da.lat, db.lng - da.lng)
+  };
+}
+
+function dispatchRide(rideId, specificTaxi = null) {
+  const idx = state.requests.findIndex(r => r.id === rideId);
+  if (idx < 0) return false;
+  const r = state.requests[idx];
+  let nearest = specificTaxi, bestHops = null;
+  if (!nearest) {
+    for (const t of state.taxis) {
+      if (t.status === IDLE) {
+        const hops = findStationPath(t.station || 0, r.from);
+        if (!bestHops || hops.length < bestHops.length) { nearest = t; bestHops = hops; }
+      }
+    }
+  } else {
+    bestHops = findStationPath(nearest.station || 0, r.from);
+  }
+  if (!nearest) {
+    state.message = "All vehicles are actively hauling! Commission more in FLEET.";
+    playTone(220, 0.12, "triangle");
+    updateHUD();
+    return false;
+  }
+  nearest.ride = r;
+  nearest.stationPath = bestHops;
+  nearest.at = 0;
+  nearest.progress = 0;
+  nearest.status = PICKUP;
+  state.requests.splice(idx, 1);
+  const orig = state.districts[r.from];
+  if (orig.supply && orig.supply[r.kind] > 0) orig.supply[r.kind]--;
+  const drv = getDriverForTaxi(nearest);
+  state.message = `#${nearest.id} (${getEngine(nearest).name} · ${drv.name}) en route to ${orig.name} (${r.km} km · Meter ${exactLocalMoney(r.meterLocal || 120)}).`;
+  playTone(540, 0.08, "sine");
+  if (bestHops.length === 1) arriveTaxi(nearest);
+  saveState();
+  updateHUD();
+  renderHubPopover();
+  return true;
+}
+
+function arriveTaxi(t) {
+  const eng = getEngine(t);
+  if (t.status === PICKUP) {
+    const orig = state.districts[t.ride.from];
+    t.station = t.ride.from;
+    if (orig.facilities & FAC_MAINT) { t.condition = 100; t.broken = false; }
+    if (state.elapsed - t.ride.created > 55) state.rating = Math.max(1, state.rating - 0.06);
+    t.status = RIDING;
+    t.stationPath = findStationPath(t.ride.from, t.ride.to);
+    t.at = 0;
+    t.progress = 0;
+  } else if (t.status === RIDING) {
+    const destIdx = t.ride.to;
+    const dest = state.districts[destIdx];
+    t.station = destIdx;
+    if (dest.facilities & FAC_MAINT) { t.condition = 100; t.broken = false; }
+
+    // Cleanliness, Maintenance & Driver Fatigue dynamics (scaled by Difficulty Mode)
+    const df = curDiff();
+    t.cleanliness = Math.max(15, (t.cleanliness ?? 100) - Math.round((rushHour() ? 9 : 6) * df.wearMult));
+    if (hasManager(1)) t.cleanliness = Math.min(100, t.cleanliness + 10);
+    if (hasManager(0) && (t.condition || 100) < 68) { t.condition = 100; t.broken = false; }
+
+    const drv = getDriverForTaxi(t);
+    if (drv) {
+      drv.trips = (drv.trips || 0) + 1;
+      const fatAdd = Math.max(1, Math.round((hasManager(2) ? 4 : 7) * df.wearMult));
+      drv.fatigue = Math.min(100, (drv.fatigue || 0) + fatAdd);
+    }
+
+    const comfortBonus = 1 + ((t.comfortLevel || 1) - 1) * 0.14;
+    const aiBonus = hasManager(3) ? 1.15 : 1.0;
+    const destLevel = dest.level;
+    const carsBonus = Math.round(t.ride.fare * (1 + (eng.cap - 2) * 0.18) * comfortBonus * aiBonus * df.fareMult);
+    const income = state.businessModel === 2 ? Math.round(eng.tip * 2.2) : Math.round(carsBonus * (state.businessModel === 1 ? 0.40 : 0.32)) + eng.tip;
+    state.grossFares += carsBonus;
+    state.cash += income;
+    state.revenue += income;
+    state.rides++;
+    state.cargoTons = (state.cargoTons || 0) + eng.cap;
+    if (dest.demandMult) {
+      const k = t.ride.kind;
+      dest.demandMult[k] = Math.max(85, dest.demandMult[k] - 7);
+      for (let o = 0; o < 4; o++) if (o !== k) dest.demandMult[o] = Math.min(180, dest.demandMult[o] + 3);
+    }
+
+    // Generate Passenger User Review based on Cleanliness, Comfort, Condition & Driver Fatigue
+    const cleanScore = (t.cleanliness ?? 100) >= 75 ? 1 : (t.cleanliness ?? 100) >= 48 ? 0 : -1;
+    const condScore = (t.condition ?? 100) >= 65 ? 1 : -1;
+    const fatPenalty = (drv && drv.fatigue > 75) ? -1 : 0;
+    let stars = Math.max(1, Math.min(5, 4 + cleanScore + (condScore < 0 ? -1 : 0) + fatPenalty + (hasManager(4) ? 1 : 0)));
+    let revText = "";
+    if (stars === 5) {
+      revText = `Spotless ${eng.name} (${Math.round(t.cleanliness)}% clean), chilled AC Lv${t.comfortLevel || 1}, and smooth driving by ${drv ? drv.name : "Driver"} to ${dest.name}!`;
+      state.rating = Math.min(5, state.rating + 0.025);
+    } else if (stars === 4) {
+      revText = `Good trip to ${dest.name} with ${drv ? drv.name : "Driver"}. Standard city meter fare (${exactLocalMoney(t.ride.meterLocal || 120)}).`;
+      state.rating = Math.min(5, state.rating + 0.01);
+    } else {
+      const reason = (t.cleanliness ?? 100) < 55 ? "cabin needed interior cleaning" : (t.condition ?? 100) < 65 ? "engine/suspension rattled" : "driver seemed fatigued";
+      revText = `Reached ${dest.name}, but ${reason}. Please maintain fleet quality!`;
+      state.rating = Math.max(1, state.rating - (hasManager(4) ? 0.02 : 0.05));
+    }
+    if (!state.reviews) state.reviews = [];
+    state.reviews.unshift({ stars, rider: `Rider #${100 + state.rides}`, text: revText, unit: t.id });
+    if (state.reviews.length > 12) state.reviews.pop();
+
+    state.message = `#${t.id} completed shift to ${dest.name}! +${money(income)} (${stars}★ review).`;
+    addFloater(destIdx, `+${money(income)}`, "#38f9d7");
+    playTone(760, 0.11, "sine");
+    t.ride = null;
+    t.status = CHARGING;
+    const chargerCut = (dest.facilities & FAC_CHARGER) ? 0.7 : 0;
+    t.charge = Math.max(0.4, 2.6 - (destLevel - 1) * 0.6 - chargerCut);
+    t.stationPath = [destIdx];
+    t.at = 0;
+    t.progress = 0;
+  }
+}
+
+function buyEngineConsist(engineId) {
+  if (state.taxis.length >= MAX_FLEET) { state.message = "12-vehicle fleet limit reached."; refreshUI(); return; }
+  const sc = currentScenario();
+  const eng = sc.vehicles[engineId];
+  if (year() < eng.year) { state.message = `${eng.name} unlocks in ${eng.year}.`; refreshUI(); return; }
+  const cost = Math.round(eng.cost * (year() >= 2015 ? 0.88 : 1.0));
+  if (state.cash < cost) { state.message = `Need ${money(cost)} to commission ${eng.name}.`; refreshUI(); return; }
+  state.cash -= cost; state.expenses += cost;
+  const id = state.taxis.length + 1;
+  const openStops = [];
+  state.districts.forEach((d, idx) => { if (d.open) openStops.push(idx); });
+  const stops = openStops.length >= 2 ? [openStops[0], openStops[id % openStops.length || 1]] : [0, 1];
+  if (!state.drivers) state.drivers = [];
+  if (state.drivers.length < id) {
+    const dName = (sc.driverPool && sc.driverPool[(id - 1) % sc.driverPool.length]) || `Captain #${id}`;
+    state.drivers.push({ id, name: dName, skill: hasManager(2) ? 4.90 : 4.72, level: 1, fatigue: 0, assignedTaxi: id, trips: 0 });
+  }
+  state.taxis.push({
+    id, station: stops[0], status: IDLE, at: 0,
+    tier: Math.min(3, Math.floor(engineId / 2) + 1), engineId,
+    progress: 0, charge: 0, condition: 100, cleanliness: 100, comfort: 82, comfortLevel: 1,
+    broken: false, driverId: id,
+    routeStops: stops, waitPolicy: 0,
+    stationPath: [stops[0]], ride: null
+  });
+  state.message = `Commissioned #${id}: ${eng.name} (${eng.kmh || 42} km/h, Cap ${eng.cap}) for ${money(cost)}!`;
+  addFloater(stops[0], `+${eng.name.toUpperCase()}`, "#ffcb52");
+  playTone(660, 0.14);
+  saveState(); refreshUI();
+}
+
+function cycleConsistRoute(taxiIdx, slotIdx) {
+  const t = state.taxis[taxiIdx];
+  if (!t.routeStops) t.routeStops = [0, 1];
+  const open = [];
+  state.districts.forEach((d, idx) => { if (d.open) open.push(idx); });
+  if (open.length < 2) return;
+  const cur = t.routeStops[slotIdx] || 0;
+  const nextPos = (open.indexOf(cur) + 1) % open.length;
+  t.routeStops[slotIdx] = open[nextPos];
+  if (t.routeStops[0] === t.routeStops[1]) {
+    t.routeStops[slotIdx] = open[(nextPos + 1) % open.length];
+  }
+  state.message = `Updated #${t.id} line: ${state.districts[t.routeStops[0]].name} ↔ ${state.districts[t.routeStops[1]].name}.`;
+  saveState(); refreshUI();
+}
+
+function cycleConsistWait(taxiIdx) {
+  const t = state.taxis[taxiIdx];
+  t.waitPolicy = ((t.waitPolicy || 0) + 1) % 3;
+  const names = ["Any Load", "Scheduled Line Only", "Full Load"];
+  state.message = `#${t.id} dispatch rule: ${names[t.waitPolicy]}.`;
+  saveState(); refreshUI();
+}
+
+function serviceConsist(taxiIdx) {
+  const t = state.taxis[taxiIdx];
+  const cost = hasManager(0) ? 210 : 280;
+  if (state.cash < cost) { state.message = `Need ${money(cost)} for mechanical maintenance overhaul.`; refreshUI(); return; }
+  state.cash -= cost; state.expenses += cost;
+  t.condition = 100; t.broken = false;
+  state.message = `Overhauled #${t.id} engine, brakes & suspension to 100% condition!`;
+  playTone(750, 0.1);
+  saveState(); refreshUI();
+}
+
+function cleanConsist(taxiIdx) {
+  const t = state.taxis[taxiIdx];
+  const cost = 110;
+  if (state.cash < cost) { state.message = `Need ${money(cost)} for interior valet wash & sanitization.`; refreshUI(); return; }
+  state.cash -= cost; state.expenses += cost;
+  t.cleanliness = 100;
+  state.message = `Deep-cleaned & sanitized #${t.id} cabin interior to 100% hygiene!`;
+  playTone(810, 0.1);
+  saveState(); refreshUI();
+}
+
+function upgradeConsistComfort(taxiIdx) {
+  const t = state.taxis[taxiIdx];
+  t.comfortLevel = t.comfortLevel || 1;
+  if (t.comfortLevel >= 3) { state.message = `#${t.id} already has Lv3 Executive Cabin Comfort.`; refreshUI(); return; }
+  const cost = 550 * t.comfortLevel;
+  if (state.cash < cost) { state.message = `Need ${money(cost)} to upgrade cabin comfort.`; refreshUI(); return; }
+  state.cash -= cost; state.expenses += cost;
+  t.comfortLevel++;
+  t.comfort = Math.min(100, 68 + t.comfortLevel * 16);
+  const pkgName = t.comfortLevel === 2 ? "Dual-Zone AC & Plush Seats" : "Executive Lounge Wi-Fi & Rear Tablet";
+  state.message = `Upgraded #${t.id} to Comfort Lv${t.comfortLevel} (${pkgName} · +14% fares & 5★ reviews)!`;
+  playTone(860, 0.12);
+  saveState(); refreshUI();
+}
+
+function recruitDriver() {
+  if (!state.drivers) state.drivers = [];
+  if (state.drivers.length >= MAX_FLEET) { state.message = "Driver roster is full (12 drivers max)."; refreshUI(); return; }
+  const cost = 420;
+  if (state.cash < cost) { state.message = `Need ${money(cost)} to recruit and onboard a licensed driver.`; refreshUI(); return; }
+  state.cash -= cost; state.expenses += cost;
+  const sc = currentScenario();
+  const id = state.drivers.length + 1;
+  const name = (sc.driverPool && sc.driverPool[(id - 1) % sc.driverPool.length]) || `Captain #${id}`;
+  const skill = hasManager(2) ? 4.90 : 4.74;
+  state.drivers.push({ id, name, skill, level: 1, fatigue: 0, assignedTaxi: id, trips: 0 });
+  state.message = `Recruited licensed driver ${name} (${skill.toFixed(2)}★ skill)!`;
+  playTone(720, 0.12);
+  saveState(); refreshUI();
+}
+
+function trainDriver(drvIdx) {
+  const d = state.drivers[drvIdx];
+  if (!d) return;
+  if ((d.level || 1) >= 3) { state.message = `${d.name} is already a Lv3 Master Chauffeur.`; refreshUI(); return; }
+  const cost = 340 * (d.level || 1);
+  if (state.cash < cost) { state.message = `Need ${money(cost)} for driver hospitality & safety training.`; refreshUI(); return; }
+  state.cash -= cost; state.expenses += cost;
+  d.level = (d.level || 1) + 1;
+  d.skill = Math.min(5.0, (d.skill || 4.7) + 0.11);
+  state.message = `Trained ${d.name} to Lv${d.level} (${d.skill.toFixed(2)}★ rating)!`;
+  playTone(840, 0.12);
+  saveState(); refreshUI();
+}
+
+function restDriver(drvIdx) {
+  const d = state.drivers[drvIdx];
+  if (!d) return;
+  const cost = 90;
+  if (state.cash < cost) { state.message = `Need ${money(cost)} for driver relief shift bonus.`; refreshUI(); return; }
+  state.cash -= cost; state.expenses += cost;
+  d.fatigue = 0;
+  state.message = `${d.name} rested with shift bonus (0% fatigue, peak alertness)!`;
+  playTone(780, 0.1);
+  saveState(); refreshUI();
+}
+
+function hireManager(mgrIdx) {
+  if (!state.managers) state.managers = MANAGER_CATALOG.map(m => ({ ...m, hired: false }));
+  const m = state.managers[mgrIdx];
+  if (!m || m.hired) return;
+  if (state.cash < m.baseCost) { state.message = `Need ${money(m.baseCost)} to recruit ${m.role}.`; refreshUI(); return; }
+  state.cash -= m.baseCost; state.expenses += m.baseCost;
+  m.hired = true;
+  state.message = `Recruited ${m.icon} ${m.role} (${m.name})! ${m.desc}`;
+  playTone(910, 0.18);
+  saveState(); refreshUI();
+}
+
+function unlockDistrict(i) {
+  const d = state.districts[i];
+  if (d.open) return;
+  const cost = districtPrice(i);
+  if (state.cash < cost) { state.message = `Need ${money(cost)} to open ${d.name}.`; refreshUI(); return; }
+  state.cash -= cost; state.expenses += cost;
+  d.open = true;
+  const path = findStationPath(0, i);
+  for (let k = 1; k < path.length; k++) setEdgeTier(path[k - 1], path[k], 1);
+  createRide(i, 0);
+  state.message = `Opened ${d.name} (${d.landmark}) & linked transit corridor!`;
+  addFloater(i, "HUB OPENED!", d.color);
+  playTone(680, 0.15);
+  saveState(); refreshUI(); renderHubPopover();
+}
+
+function upgradeDistrict(i) {
+  const d = state.districts[i];
+  if (!d.open || d.level >= 3) return;
+  const cost = districtUpgradePrice(i);
+  if (state.cash < cost) { state.message = `Need ${money(cost)} to upgrade ${d.name}.`; refreshUI(); return; }
+  state.cash -= cost; state.expenses += cost;
+  d.level++;
+  state.message = `Upgraded ${d.name} to Lv${d.level} (${d.level === 2 ? "Express Hub" : "Mega Terminal"})!`;
+  addFloater(i, `HUB LV${d.level}!`, "#ffcb52");
+  playTone(880, 0.14);
+  saveState(); refreshUI(); renderHubPopover();
+}
+
+function cycleWorldCity() {
+  const nextId = ((state.scenarioId || 0) + 1) % WORLD_SCENARIOS.length;
+  switchWorldScenario(nextId);
+}
+
+function switchWorldScenario(scenIdx) {
+  createScenarioState(scenIdx);
+  createRide(0, 1);
+  createRide(1, 2);
+  selectedHub = -1;
+  saveState();
+  closeSheet();
+  resetCamera();
+  refreshUI();
+  playTone(740, 0.16);
+}
+
+function cycleMapStyle() {
+  mapStyleIdx = (mapStyleIdx + 1) % MAP_STYLES.length;
+  persistMapStyle();
+  document.getElementById("mapStyleLabel").textContent = MAP_STYLES[mapStyleIdx].name;
+}
+
+function setBusinessModel(m) {
+  if (m === 1 && year() < 2014) { state.message = "Corporate Surge model unlocks in 2014."; refreshUI(); return; }
+  if (m === 2 && year() < 2021) { state.message = "Zero-Commission Driver Subscription unlocks in 2021."; refreshUI(); return; }
+  state.businessModel = m;
+  const names = ["Commission (32%)", "Corporate Surge (40%)", "Zero-Commission Subscription"];
+  state.message = `Switched business model to ${names[m]}.`;
+  saveState(); refreshUI();
+}
+
+function buyShares(i, margin) {
+  const c = state.companies[i];
+  if (c.merged || c.owned >= 100) return;
+  const full = c.price * 10, borrow = margin ? Math.floor(full / 2) : 0, cost = full - borrow;
+  if (state.cash < cost) { state.message = "Insufficient cash for share purchase."; refreshUI(); return; }
+  if (margin && (portfolioValue() + full - state.marginDebt - borrow) / (portfolioValue() + full) < 0.5) {
+    state.message = "Leverage limit reached: repay margin debt before borrowing more.";
+    refreshUI(); return;
+  }
+  state.cash -= cost;
+  state.marginDebt += borrow;
+  c.owned += 10;
+  state.message = `Bought 10% of ${c.name} ${margin ? "on 50% margin" : "for cash"}.`;
+  playTone(600, 0.09);
+  saveState(); refreshUI();
+}
+
+function sellShares(i) {
+  const c = state.companies[i];
+  if (c.merged || c.owned < 10) return;
+  const proceeds = c.price * 10;
+  const repay = Math.min(state.marginDebt, proceeds);
+  state.marginDebt -= repay;
+  state.cash += proceeds - repay;
+  c.owned -= 10;
+  state.message = `Sold 10% of ${c.name}.`;
+  saveState(); refreshUI();
+}
+
+function mergerPrice(i) {
+  const c = state.companies[i];
+  return Math.ceil((100 - c.owned) * c.price * 1.15) + 1200;
+}
+
+function mergeCompany(i) {
+  const c = state.companies[i];
+  if (c.merged || c.owned < 60) { state.message = "Own at least 60% of voting shares to merge."; refreshUI(); return; }
+  if (state.marginDebt > 0) { state.message = "Repay all margin debt before completing a takeover."; refreshUI(); return; }
+  const cost = mergerPrice(i);
+  if (state.cash < cost) { state.message = `Need ${money(cost)} to complete takeover of ${c.name}.`; refreshUI(); return; }
+  state.cash -= cost;
+  const inherited = Math.min(c.fleet, MAX_FLEET - state.taxis.length);
+  for (let n = 0; n < inherited; n++) {
+    state.taxis.push({
+      id: state.taxis.length + 1, station: c.district, status: IDLE,
+      at: 0, tier: 2, engineId: 2, progress: 0, charge: 0, condition: 100, broken: false,
+      routeStops: [0, c.district], waitPolicy: 0,
+      stationPath: [c.district], ride: null
+    });
+  }
+  state.cash += c.cash + (c.fleet - inherited) * 1500;
+  state.districts[c.district].open = true;
+  const path = findStationPath(0, c.district);
+  for (let k = 1; k < path.length; k++) setEdgeTier(path[k - 1], path[k], 2);
+  c.owned = 0;
+  c.merged = true;
+  state.message = `Acquired ${c.name}! Integrated fleet, corridors & ${state.districts[c.district].name}.`;
+  publishBulletin({id:'takeover-'+i,category:'Business extra',title:'Lantern takes control of '+c.name,body:'The takeover is complete. '+inherited+' vehicles joined your fleet, and '+state.districts[c.district].name+' is now part of the network.',impact:'Acquisition payment: '+money(cost)+'. The rival treasury and integration proceeds have been added to your company cash.',tab:1,action:'Review the combined fleet',urgent:true});
+  playTone(920, 0.2);
+  saveState(); refreshUI();
+}
+
+function repayMargin() {
+  const n = Math.min(Math.max(0, state.cash), state.marginDebt);
+  state.cash -= n;
+  state.marginDebt -= n;
+  state.message = n > 0 ? `Repaid ${money(n)} of margin debt.` : "No margin debt or cash to repay.";
+  saveState(); refreshUI();
+}
+
+function issueBond() {
+  if (state.bonds >= MAX_BONDS) { state.message = "Maximum 3 corporate bonds (15,000 cr) already active."; refreshUI(); return; }
+  state.bonds++;
+  state.cash += BOND_FACE;
+  state.message = "Issued 5,000 cr Corporate Bond (175 cr quarterly coupon).";
+  saveState(); refreshUI();
+}
+
+function repayBond() {
+  if (state.bonds <= 0) { state.message = "No corporate bonds outstanding."; refreshUI(); return; }
+  if (state.cash < BOND_FACE) { state.message = `Need ${money(BOND_FACE)} to retire a corporate bond.`; refreshUI(); return; }
+  state.cash -= BOND_FACE;
+  state.bonds--;
+  state.message = "Retired 5,000 cr Corporate Bond!";
+  saveState(); refreshUI();
+}
+
+function maintainMargin() {
+  const v = portfolioValue();
+  if (state.marginDebt === 0) return;
+  if (v === 0 || equityRatio() < 0.30) {
+    state.cash += v - state.marginDebt;
+    state.marginDebt = 0;
+    state.companies.forEach(c => c.owned = 0);
+    state.marginCalls++;
+    state.message = "Margin Call! Broker liquidated stock portfolio to cover debt.";
+    publishBulletin({id:'margin-'+state.marginCalls,category:'Financial alert',title:'Broker liquidates Lantern’s portfolio',body:'Your portfolio equity fell below the margin requirement. The broker sold all your shareholdings to settle the outstanding borrowing.',impact:'Remaining company cash: '+money(state.cash)+'. Margin debt has been cleared; any liquidation shortfall was charged to your cash.',tab:4,action:'Review company finances',urgent:true});
+  }
+}
+
+function checkSolvency() {
+  if (state.cash >= -2500) return;
+  state.restructurings++;
+  state.rating = Math.max(1.0, state.rating - 0.15);
+  if (state.bonds < MAX_BONDS) {
+    state.bonds++;
+    state.cash += 4500;
+    state.expenses += 500;
+    state.message = "Insolvency Restructuring: Emergency bond issued at discount!";
+  } else if (state.taxis.length > 1) {
+    state.taxis.pop();
+    state.cash += 1800;
+    state.message = "Receivership Restructuring: 1 vehicle auctioned to restore liquidity.";
+  } else {
+    state.cash = -500;
+  }
+  publishBulletin({id:'restructure-'+state.restructurings,category:'Company alert',title:'Lantern enters emergency restructuring',body:state.message,impact:'Company cash now stands at '+money(state.cash)+'. Outstanding bonds: '+state.bonds+'. Review operating costs and debt before expanding.',tab:4,action:'Review finances',urgent:true});
+}
+
+function tickSimulation(seconds) {
+  if (bulletinOpen() || state.speed === 0 || seconds <= 0) return;
+  const dt = Math.min(0.25, seconds) * state.speed;
+  state.elapsed += dt;
+  state.spawnClock += dt;
+  state.costClock += dt;
+  state.marketClock += dt;
+  state.competitionClock += dt;
+
+  const y = year();
+  const sc = currentScenario();
+  // Trigger city-specific taxi revolution milestones!
+  sc.chronicle.forEach((ev, idx) => {
+    if (state.historyStage <= idx && y >= ev.year) {
+      state.historyStage = idx + 1;
+      if (ev.text.includes('Simulated pandemic shock')) state.message = ev.text;
+      if (ev.year === 2020 && !state.pandemicMarketApplied) {
+        state.pandemicMarketApplied = true;
+        state.companies.forEach(c => {
+          if (!c.merged) {
+            c.price = Math.max(5, Math.round(c.price * 0.48));
+            c.priceHistory.push(c.price);
+          }
+        });
+        maintainMargin();
+      }
+    }
+  });
+
+  const interval = Math.max(2.2, 8.5 - openCount() - totalHubLevels() * 0.25) / demandFactor();
+  while (state.spawnClock >= interval) {
+    state.spawnClock -= interval;
+    generateRide();
+  }
+  while (state.marketClock >= 15) {
+    state.marketClock -= 15;
+    state.marketTick++;
+    if (state.businessModel === 2) {
+      const sub = state.taxis.length * 95;
+      state.cash += sub; state.revenue += sub;
+    }
+    state.districts.forEach(d => {
+      if (d.open && d.demandMult) {
+        for (let k = 0; k < 4; k++) d.demandMult[k] = Math.min(180, d.demandMult[k] + 3);
+      }
+    });
+    const marketMoves=[];
+    state.companies.forEach((c, i) => {
+      if (c.merged) return;
+      const previousPrice=c.price;
+      const wave = Math.sin((state.marketTick + i * 3) * 1.7) * 0.035;
+      const trend = y === 2020 ? -0.012 : 0.014;
+      const fundamental = (c.cash + c.fleet * 1800) / 100;
+      const pull = Math.max(-0.025, Math.min(0.025, (fundamental / c.price - 1) * 0.04));
+      c.price = Math.max(5, Math.round(c.price * (1 + trend + wave + pull)));
+      c.priceHistory.push(c.price);
+      if (c.priceHistory.length > 18) c.priceHistory.shift();
+      const div = c.owned * (c.cash > 2500 ? 1 : 0);
+      state.cash += div; state.dividends += div; c.cash -= div;
+      marketMoves.push({name:c.name,price:c.price,change:Math.round((c.price/previousPrice-1)*1000)/10,owned:c.owned,dividend:div});
+    });
+    const interest = Math.floor((state.marginDebt + 49) / 50) + state.bonds * 175;
+    state.cash -= interest; state.expenses += interest;
+    maintainMargin();
+    checkSolvency();
+    if(state.marketTick%3===0 && marketMoves.length) {
+      const leader=marketMoves.reduce((a,b)=>Math.abs(b.change)>Math.abs(a.change)?b:a);
+      publishBulletin({id:'market-'+state.marketTick,category:'Simulated company market',title:leader.name+(leader.change>=0?' leads the market report':' under pressure'),body:marketMoves.map(m=>m.name+': '+money(m.price)+' per share ('+(m.change>=0?'+':'')+m.change+'% this quarter). Your stake: '+m.owned+'%.'+(m.dividend?' Dividend received: '+money(m.dividend)+'.':'')).join('\n\n'),impact:'Company cash: '+money(state.cash)+'. Margin debt: '+money(state.marginDebt)+'. Bond debt: '+money(bondDebt())+'. These are fictional rival prices, separate from the historical USD reference archive.',tab:4,action:'Open stock exchange',archiveOnly:true});
+    }
+    if (activeTab > 0) renderSheet();
+  }
+  const df = curDiff();
+  const rivalInterval = Math.max(7, 16 / df.rivalMult);
+  while (state.competitionClock >= rivalInterval) {
+    state.competitionClock -= rivalInterval;
+    state.companies.forEach(c => {
+      if (!c.merged) {
+        c.cash += Math.round(c.fleet * 18 * df.rivalMult);
+        c.served++;
+        if (state.requests.length > 0) {
+          state.requests.shift();
+          state.message = `${c.name} won a waiting fare! Upgrade corridors or acquire them.`;
+        }
+      }
+    });
+  }
+  while (state.costClock >= 1) {
+    state.costClock -= 1;
+    const upkeep = Math.max(1, Math.round(state.taxis.length * 2 * df.upkeepMult));
+    state.cash -= upkeep; state.expenses += upkeep;
+  }
+  state.requests = state.requests.filter(r => {
+    if (state.elapsed - r.created > df.patienceSec) {
+      state.missed++;
+      state.rating = Math.max(1, state.rating - 0.04 * df.wearMult);
+      return false;
+    }
+    return true;
+  });
+
+  // Move Player Vehicles along Real Station-to-Station Corridors at Realistic City Traffic Speed
+  for (const t of state.taxis) {
+    if (t.status === CHARGING) {
+      t.charge -= dt;
+      if (t.charge <= 0) { t.status = IDLE; t.charge = 0; }
+      continue;
+    }
+    if (t.status !== PICKUP && t.status !== RIDING) continue;
+    const eng = getEngine(t);
+    t.condition = Math.max(10, (t.condition || 100) - dt * (1.03 - eng.rel) * 0.45 * df.wearMult);
+    t.broken = t.condition < 28;
+    const path = t.stationPath || [0];
+    const u = path[Math.min(t.at, path.length - 1)];
+    const v = path[Math.min(t.at + 1, path.length - 1)];
+    const edgeTier = Math.max(1, getEdgeTier(u, v));
+    const trackMult = edgeTier === 3 ? 1.45 : edgeTier === 2 ? 1.22 : 1.0;
+    const distKm = Math.max(1.8, haversineKm(state.districts[u].lat, state.districts[u].lng, state.districts[v].lat, state.districts[v].lng));
+    // Smooth, realistic city cruising pace (~5x calmer than before)
+    const stepSpeed = (0.42 / Math.max(1.2, distKm * 0.42)) * eng.speed * trackMult * trafficFactor() * (t.broken ? 0.35 : 1.0);
+    t.progress += dt * stepSpeed;
+    while (t.progress >= 1 && (t.status === PICKUP || t.status === RIDING)) {
+      t.progress--;
+      t.at++;
+      t.station = path[Math.min(t.at, path.length - 1)];
+      if (t.at >= path.length - 1) { arriveTaxi(t); break; }
+    }
+  }
+
+  // Move Rival AI Vehicles at a calm, realistic city pace
+  state.companies.forEach((c, i) => {
+    if (c.merged) return;
+    c.progress = (c.progress || 0) + dt * 0.085 * trafficFactor();
+    if (c.progress >= 1) {
+      c.progress = 0;
+      c.fromStation = c.toStation;
+      c.toStation = (c.toStation + 1 + i) % state.districts.length;
+    }
+  });
+
+  if (state.autoDispatch) {
+    for (const t of state.taxis) {
+      if (t.status !== IDLE) continue;
+      const stops = t.routeStops || [0, 1];
+      let match = state.requests.find(r => stops.includes(r.from) && stops.includes(r.to));
+      if (!match && (t.waitPolicy || 0) === 0) match = state.requests[0];
+      if (match) dispatchRide(match.id, t);
+    }
+  }
+
+  if (!state.scenarioWon && openCount() >= sc.targetStations && state.rides >= sc.targetRides && netWorth() >= sc.targetWorth) {
+    state.scenarioWon = true;
+    state.cash += 8000;
+    state.message = `🥇 GOLD MEDAL IN ${sc.city.toUpperCase()} (${sc.title})! +${money(8000)} prize awarded!`;
+    publishBulletin({id:'city-victory',category:'Special edition',title:'Lantern becomes a city success story',body:'Your company has met the '+sc.city+' campaign targets for connected hubs, completed trips, and net worth.',impact:'A campaign prize of '+money(8000)+' has been credited. Continue building here or explore another city.',tab:5,action:'Review city campaigns',urgent:true});
+    playTone(960, 0.25);
+  }
+  if (typeof evaluateActiveModeGoals === "function") evaluateActiveModeGoals();
+}
+
+function saveState() {
+  try { localStorage.setItem("lantern_realmap_v6", JSON.stringify(state)); } catch (e) {}
+}
+function loadState() {
+  try {
+    const raw = localStorage.getItem("lantern_realmap_v6");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      createScenarioState(parsed.scenarioId || 0, parsed.difficulty ?? 2);
+      Object.assign(state, parsed);
+      state.historyStage=currentScenario().chronicle.filter(e=>e.year<=year()).length;
+      state.pandemicMarketApplied=parsed.pandemicMarketApplied ?? year()>=2020;
+      if (!state.drivers || state.drivers.length === 0) {
+        const sc = currentScenario();
+        state.drivers = [{ id: 1, name: sc.driverPool[0], skill: 4.82, level: 1, fatigue: 5, assignedTaxi: 1, trips: 0 }];
+      }
+      if (!state.managers || state.managers.length === 0) {
+        state.managers = MANAGER_CATALOG.map(m => ({ ...m, hired: false }));
+      }
+      if (!state.reviews || state.reviews.length === 0) {
+        state.reviews = [{ stars: 5, rider: "Verified Rider", text: "Clean vehicle and polite driver!", unit: 1 }];
+      }
+      return;
+    }
+  } catch (e) {}
+  createScenarioState(0);
+  createRide(0, 1);
+  createRide(1, 2);
+}
+
+/*
+ * REAL NAVIGABLE SLIPPY MAP CAMERA & TOUCH GESTURES
+ */
+const canvas = document.getElementById("mapCanvas");
+const ctx = canvas.getContext("2d");
+let pointers = new Map();
+let dragLast = null, pinchStartDist = 0, pinchStartZoom = 12, movedDistance = 0;
+
+function resetCamera() {
+  const sc = currentScenario();
+  mapCam.lat = sc.centerLat;
+  mapCam.lng = sc.centerLng;
+  mapCam.zoom = window.innerWidth < 600 ? sc.defaultZoom - 0.35 : sc.defaultZoom;
+  selectedHub = -1;
+  renderHubPopover();
+}
+
+function zoomBy(delta) {
+  mapCam.zoom = Math.max(9.5, Math.min(16.5, mapCam.zoom + delta * 0.65));
+}
+
+window.addEventListener("resize", () => {
+  canvas.width = window.innerWidth * devicePixelRatio;
+  canvas.height = window.innerHeight * devicePixelRatio;
+});
+
+canvas.addEventListener("pointerdown", e => {
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointers.size === 1) {
+    dragLast = { x: e.clientX, y: e.clientY };
+    movedDistance = 0;
+  } else if (pointers.size === 2) {
+    const pts = [...pointers.values()];
+    pinchStartDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    pinchStartZoom = mapCam.zoom;
+  }
+});
+
+canvas.addEventListener("pointermove", e => {
+  if (!pointers.has(e.pointerId)) return;
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointers.size === 1 && dragLast) {
+    const dx = e.clientX - dragLast.x;
+    const dy = e.clientY - dragLast.y;
+    movedDistance += Math.hypot(dx, dy);
+    dragLast = { x: e.clientX, y: e.clientY };
+    const newCenter = screenToLatLng(window.innerWidth * 0.5 - dx, window.innerHeight * 0.5 - dy);
+    mapCam.lat = newCenter.lat;
+    mapCam.lng = newCenter.lng;
+  } else if (pointers.size === 2) {
+    const pts = [...pointers.values()];
+    const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    if (pinchStartDist > 12) {
+      mapCam.zoom = Math.max(9.5, Math.min(16.5, pinchStartZoom + Math.log2(dist / pinchStartDist)));
+    }
+  }
+});
+
+canvas.addEventListener("pointerup", e => {
+  pointers.delete(e.pointerId);
+  if (movedDistance < 12) handleMapTap(e.clientX, e.clientY);
+  if (pointers.size === 1) {
+    const pt = [...pointers.values()][0];
+    dragLast = { x: pt.x, y: pt.y };
+  } else {
+    dragLast = null;
+  }
+});
+
+canvas.addEventListener("wheel", e => {
+  e.preventDefault();
+  const delta = e.deltaY < 0 ? 0.35 : -0.35;
+  mapCam.zoom = Math.max(9.5, Math.min(16.5, mapCam.zoom + delta));
+}, { passive: false });
+
+function handleMapTap(clientX, clientY) {
+  let nearest = -1, bestDist = 42;
+  state.districts.forEach((d, idx) => {
+    const pt = latLngToScreen(d.lat, d.lng);
+    const dist = Math.hypot(pt.x - clientX, pt.y - clientY);
+    if (dist < bestDist) { bestDist = dist; nearest = idx; }
+  });
+  if (nearest >= 0) {
+    selectedHub = nearest;
+    const waiting = state.requests.find(r => r.from === nearest);
+    if (waiting && state.districts[nearest].open) {
+      dispatchRide(waiting.id);
+    }
+    renderHubPopover();
+  } else {
+    selectedHub = -1;
+    renderHubPopover();
+  }
+}
+
+function renderHubPopover() {
+  const pop = document.getElementById("hubPopover");
+  if (selectedHub < 0) {
+    pop.classList.remove("visible");
+    return;
+  }
+  const d = state.districts[selectedHub];
+  const waiting = state.requests.find(r => r.from === selectedHub);
+  const minCorridor = corridorLinkMinTier(0, selectedHub);
+  const nextTier = Math.min(3, minCorridor + 1);
+  const linkCost = corridorLinkCost(0, selectedHub, nextTier);
+
+  let btns = "";
+  if (!d.open) {
+    btns += `<button class="cyber-btn gold" onclick="unlockDistrict(${selectedHub})">Open Hub (${money(districtPrice(selectedHub))})</button>`;
+  } else {
+    if (waiting) {
+      btns += `<button class="cyber-btn" onclick="dispatchRide(${waiting.id})">Dispatch (${money(waiting.fare)})</button>`;
+    }
+    if (d.level < 3) {
+      btns += `<button class="cyber-btn" onclick="upgradeDistrict(${selectedHub})">Hub Lv${d.level + 1} (${money(districtUpgradePrice(selectedHub))})</button>`;
+    }
+    if (selectedHub !== 0 && linkCost > 0) {
+      btns += `<button class="cyber-btn gold" onclick="buildCorridorLink(0,${selectedHub},${nextTier})">Corridor T${nextTier} (${money(linkCost)})</button>`;
+    }
+  }
+  pop.innerHTML = `
+    <div class="flex-between">
+      <div>
+        <div class="h-title" style="color:${d.color};font-size:13px">${d.name} ${d.open ? "· Lv" + d.level : "· Locked"}</div>
+        <div class="h-desc" style="font-size:10.5px">${d.landmark} · ${d.specialty}</div>
+      </div>
+      <button class="drawer-close" style="width:24px;height:24px;font-size:11px" onclick="selectedHub=-1;renderHubPopover()">✕</button>
+    </div>
+    <div class="btn-row" style="margin-top:2px">${btns}</div>`;
+  pop.classList.add("visible");
+}
+
+function makeSparkline(arr, color) {
+  if (!arr || arr.length < 2) return "";
+  const min = Math.min(...arr), max = Math.max(...arr);
+  const span = Math.max(1, max - min);
+  const pts = arr.map((v, idx) => {
+    const x = (idx / (arr.length - 1)) * 96 + 2;
+    const y = 26 - ((v - min) / span) * 22;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  return `<svg width="100" height="28" viewBox="0 0 100 28"><polyline fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" points="${pts}"/></svg>`;
+}
+
+let activeTab = 0;
+let lastCardHash = "";
+
+function selectTab(idx) {
+  activeTab = idx;
+  document.body.classList.toggle('drawer-visible',idx !== 0);
+  for (let i = 0; i < 6; i++) {
+    const el = document.getElementById("tab" + i);
+    if (el) el.classList.toggle("active", i === idx);
+  }
+  const sheet = document.getElementById("bottomSheet");
+  const backdrop = document.getElementById("sheetBackdrop");
+  if (idx === 0) {
+    sheet.classList.remove("open");
+    backdrop.classList.remove("open");
+  } else {
+    renderSheet();
+    sheet.classList.add("open");
+    backdrop.classList.add("open");
+  }
+}
+
+function closeSheet() { selectTab(0); }
+
+function toggleAuto() {
+  state.autoDispatch = !state.autoDispatch;
+  state.message = state.autoDispatch ? "Auto-Line ON: Vehicles automatically serve scheduled corridors." : "Manual Dispatch mode enabled.";
+  playTone(state.autoDispatch ? 660 : 400, 0.08);
+  saveState(); updateHUD();
+}
+
+function cycleSpeed() {
+  state.speed = state.speed === 1 ? 2 : state.speed === 2 ? 4 : state.speed === 4 ? 0 : 1;
+  state.message = state.speed === 0 ? "Simulation Paused." : `Simulation speed set to ${state.speed}×.`;
+  saveState(); updateHUD();
+}
+
+
+// Chapter rewards are explicit, saved, and claimed once per city campaign.
+const JOURNEY = [
+  {title:'Your first regulars', description:'One vehicle. A city full of possibilities. Complete five trips to establish your first reliable service.', target:5, value:()=>state.rides, unit:'trips completed', reward:1200, tab:0, action:'Watch your first trips'},
+  {title:'Make room for growth', description:'Demand is building. Add a second vehicle and give more people a reason to choose Lantern.', target:2, value:()=>state.taxis.length, unit:'vehicles in service', reward:1800, tab:1, action:'Grow your fleet'},
+  {title:'A bigger neighbourhood', description:'Connect a fourth hub. New destinations create more opportunities for your network.', target:4, value:()=>openCount(), unit:'hubs connected', reward:2200, tab:3, action:'Choose your next hub'},
+  {title:'Build a reputation', description:'Reach 25 completed trips. Watch vehicle condition and give your drivers the support they need.', target:25, value:()=>state.rides, unit:'trips completed', reward:3000, tab:2, action:'Check your team'},
+  {title:'Invest in the journey', description:'Upgrade a hub to level two. Build a better network before expanding further.', target:1, value:()=>totalHubLevels(), unit:'hub upgrades', reward:2500, tab:3, action:'Improve a hub'},
+  {title:'The city knows your name', description:'Complete 75 trips and turn a small operation into an established city service.', target:75, value:()=>state.rides, unit:'trips completed', reward:5000, tab:0, action:'Return to the city'}
+];
+function journeyIndex() { return Math.max(0,Math.min(JOURNEY.length, Math.floor(Number(state.journeyChapter)||0))); }
+function toggleOptions() {
+  const open=document.body.classList.toggle('show-options');
+  document.getElementById('optionsToggle').setAttribute('aria-expanded',String(open));
+}
+function toggleJourney() {
+  state.journeyCompact=!state.journeyCompact; saveState(); updateJourney();
+}
+function journeyAction() {
+  const index=journeyIndex(), goal=JOURNEY[index];
+  if(!goal) { selectTab(5); return; }
+  if(goal.value()>=goal.target) {
+    state.cash+=goal.reward; state.journeyChapter=index+1;
+    state.message='Chapter complete: '+goal.title+'. '+money(goal.reward)+' awarded.';
+    playTone(880,.16); saveState(); refreshUI();
+  } else { selectTab(goal.tab); }
+}
+function updateJourney() {
+  const index=journeyIndex(), goal=JOURNEY[index];
+  document.getElementById('journey').classList.toggle('compact',!!state.journeyCompact);
+  const toggle=document.getElementById('journeyToggle');
+  toggle.textContent=state.journeyCompact?'+':'−';
+  toggle.setAttribute('aria-expanded',String(!state.journeyCompact));
+  toggle.setAttribute('aria-label',state.journeyCompact?'Expand goal':'Collapse goal');
+  document.getElementById('journeyChapter').textContent=goal?'Your company · Chapter '+(index+1)+' / '+JOURNEY.length:'Your company · Established';
+  document.getElementById('journeyTitle').textContent=goal?goal.title:'An empire of your own';
+  document.getElementById('journeyDescription').textContent=goal?goal.description:'Your opening chapters are complete. Build out this network, challenge your rivals, or explore another city.';
+  const value=goal?Math.min(goal.target,goal.value()):1, percent=goal?Math.round(value/goal.target*100):100;
+  document.getElementById('journeyFill').style.width=percent+'%';
+  document.getElementById('journeyProgress').setAttribute('aria-valuenow',String(percent));
+  document.getElementById('journeyCount').textContent=goal?value+' / '+goal.target+' '+goal.unit:'All six chapters complete';
+  document.getElementById('journeyReward').textContent=goal?'Reward '+money(goal.reward):'';
+  document.getElementById('journeyAction').textContent=!goal?'Explore cities':value>=goal.target?'Claim '+money(goal.reward)+' & continue':goal.action;
+  const busy=state.taxis.filter(t=>t.status!==IDLE).length;
+  document.getElementById('journeySummary').textContent=busy+' / '+state.taxis.length+' vehicles working · '+state.rides+' trips completed'+(state.speed===0?' · Simulation paused':state.autoDispatch?' · Auto dispatch on':' · Manual dispatch');
+}
+
+function updateHUD() {
+  updateJourney();
+  if (typeof syncModeBannerInJourney === "function") syncModeBannerInJourney();
+  updatePress();
+  renderHistoricalMarket();
+  updateMapFeedback();
+  const sc = currentScenario();
+  const L = curLang();
+  document.getElementById("cityFlag").textContent = sc.flag;
+  document.getElementById("cityTitle").textContent = `${sc.city.toUpperCase()} (${sc.currencySymbol})`;
+  document.getElementById("scenarioSub").textContent = `${sc.startYear}–${sc.endYear} · ${sc.currencyCode} TARIF`;
+  document.getElementById("mapStyleLabel").textContent = MAP_STYLES[mapStyleIdx].name;
+  document.getElementById("langLabel").textContent = L.label;
+  const diffEl = document.getElementById("diffLabel");
+  if (diffEl) diffEl.textContent = curDiff().name;
+
+  // Multi-language HUD & Dock labels
+  document.getElementById("lblCash").textContent = L.cash;
+  document.getElementById("lblWorth").textContent = L.worth;
+  document.getElementById("lblRating").textContent = L.rating;
+  document.getElementById("lblYear").textContent = L.year;
+  document.getElementById("worldBtnLabel").textContent = L.nextCity;
+  document.getElementById("lblFit").textContent = L.fit;
+  document.getElementById("dockLbl0").textContent = L.map;
+  document.getElementById("dockLbl1").textContent = L.fleet;
+  document.getElementById("dockLbl2").textContent = L.staff;
+  document.getElementById("dockLbl3").textContent = L.hubs;
+  document.getElementById("dockLbl4").textContent = L.finance;
+  document.getElementById("dockLbl5").textContent = L.cities;
+
+  const cashEl = document.getElementById("hudCash");
+  cashEl.textContent = money(state.cash);
+  cashEl.className = "kpi-num " + (state.cash < 0 ? "danger" : "cyan");
+  document.getElementById("hudWorth").textContent = money(netWorth());
+  document.getElementById("hudRating").textContent = state.rating.toFixed(2) + " ★";
+  document.getElementById("hudYear").textContent = year();
+  document.getElementById("hudMessage").textContent = state.message;
+
+  const btnAuto = document.getElementById("btnAuto");
+  btnAuto.className = "cyber-pill " + (state.autoDispatch ? "glow-mint" : "");
+  document.getElementById("autoLed").className = "led " + (state.autoDispatch ? "on" : "");
+  document.getElementById("autoLabel").textContent = "AUTO: " + (state.autoDispatch ? "ON" : "OFF");
+  document.getElementById("speedLabel").textContent = state.speed === 0 ? "PAUSED" : state.speed + "×";
+
+  const carousel = document.getElementById("rideCarousel");
+  const hash = langIdx + ":" + state.requests.map(r => r.id + ":" + Math.floor((state.elapsed - r.created) * 2)).join("|");
+  if (hash !== lastCardHash) {
+    lastCardHash = hash;
+    if (state.requests.length === 0) {
+      carousel.innerHTML = `<div class="ride-ticket" style="min-width:280px;opacity:0.92">
+        <div class="ticket-origin">${sc.flag} ${sc.city} (${sc.tariffDesc})</div>
+        <div class="ticket-dest"><span>Scanning ${openCount()} city hubs for live passenger & parcel trips…</span></div>
+      </div>`;
+    } else {
+      const patSec = curDiff().patienceSec || 65;
+      carousel.innerHTML = state.requests.map(r => {
+        const rem = Math.max(0, Math.min(100, (1 - (state.elapsed - r.created) / patSec) * 100));
+        const meterStr = exactLocalMoney(r.meterLocal || (sc.baseFare + Number(r.km || 5) * sc.perKmRate));
+        return `<div class="ride-ticket" onclick="dispatchRide(${r.id})">
+          <div class="ticket-head">
+            <span class="class-pill" style="color:${KIND_COLORS[r.kind]}">${KIND_NAMES[r.kind]} · ${r.km || '5.2'} km</span>
+            <span class="ticket-fare">${meterStr} <small style="font-size:9px;color:var(--mint)">(Shift +${money(r.fare)})</small></span>
+          </div>
+          <div class="ticket-origin">${state.districts[r.from].name}</div>
+          <div class="ticket-dest">
+            <span>→ ${state.districts[r.to].name}</span>
+            <span class="send-tag">${L.dispatch}</span>
+          </div>
+          <div class="timer-strip" style="width:${rem}%"></div>
+        </div>`;
+      }).join("");
+    }
+  }
+}
+
+function renderSheet() {
+  const title = document.getElementById("sheetTitle");
+  const body = document.getElementById("sheetBody");
+  const sc = currentScenario();
+
+  if (activeTab === 1) {
+    title.textContent = `🚖 ${sc.city.toUpperCase()} FLEET, MAINTENANCE, HYGIENE & COMFORT`;
+    const waitNames = ["Any Trip", "Line Stops Only", "High-Capacity"];
+    const svcCost = hasManager(0) ? 210 : 280;
+    const rosterHtml = state.taxis.map((t, idx) => {
+      const eng = getEngine(t);
+      const drv = getDriverForTaxi(t);
+      const st = ["IDLE", "PICKUP", "IN TRANSIT", "RECHARGING"][t.status];
+      const s0 = state.districts[(t.routeStops || [0, 1])[0]].name;
+      const s1 = state.districts[(t.routeStops || [0, 1])[1]].name;
+      const cond = Math.round(t.condition ?? 100);
+      const clean = Math.round(t.cleanliness ?? 100);
+      const comfLvl = t.comfortLevel || 1;
+      const comfPct = Math.min(100, 68 + comfLvl * 16);
+      const comfCost = 550 * comfLvl;
+      return `<div class="holo-card">
+        <div class="flex-between">
+          <div>
+            <div class="h-title">Unit #${t.id}: ${eng.name} (${eng.kmh || 40} km/h · Cap ${eng.cap})</div>
+            <div class="h-desc">
+              Driver: <strong style="color:var(--cyan)">${drv ? drv.name : "Captain"} (${drv ? drv.skill.toFixed(2) : "4.80"}★)</strong> ·
+              Status: <strong style="color:var(--mint)">${t.broken ? "⚠️ BREAKDOWN" : st}</strong>
+            </div>
+          </div>
+          <span class="fleet-badge" style="color:var(--gold)">Comfort Lv${comfLvl}</span>
+        </div>
+        <div class="qual-bars">
+          <div class="q-pill">
+            🔧 Mech: <strong>${cond}%</strong>
+            <div class="q-track"><div class="q-fill" style="width:${cond}%;background:${cond > 65 ? '#38f9d7' : '#ff6464'}"></div></div>
+          </div>
+          <div class="q-pill">
+            ✨ Clean: <strong>${clean}%</strong>
+            <div class="q-track"><div class="q-fill" style="width:${clean}%;background:${clean > 65 ? '#00f2fe' : '#ffcb52'}"></div></div>
+          </div>
+          <div class="q-pill">
+            🛋️ Comfort: <strong>${comfPct}%</strong>
+            <div class="q-track"><div class="q-fill" style="width:${comfPct}%;background:#ffcb52"></div></div>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="cyber-btn ${cond < 85 ? 'gold' : ''}" onclick="serviceConsist(${idx})">🔧 Service (${money(svcCost)})</button>
+          <button class="cyber-btn ${clean < 85 ? 'gold' : ''}" onclick="cleanConsist(${idx})">🧼 Valet Wash (${money(110)})</button>
+          <button class="cyber-btn ${comfLvl < 3 ? 'gold' : 'dim'}" onclick="upgradeConsistComfort(${idx})">
+            🛋️ ${comfLvl < 3 ? `Comfort Lv${comfLvl + 1} (${money(comfCost)})` : "Max Comfort ✓"}
+          </button>
+        </div>
+        <div class="btn-row">
+          <button class="cyber-btn" onclick="cycleConsistRoute(${idx}, 0)">Hub A: ${s0}</button>
+          <button class="cyber-btn" onclick="cycleConsistRoute(${idx}, 1)">Hub B: ${s1}</button>
+          <button class="cyber-btn dim" onclick="cycleConsistWait(${idx})">Rule: ${waitNames[t.waitPolicy || 0]}</button>
+        </div>
+      </div>`;
+    }).join("");
+
+    const shopHtml = sc.vehicles.map(e => {
+      const unlocked = year() >= e.year;
+      const cost = Math.round(e.cost * (year() >= 2015 ? 0.88 : 1.0));
+      return `<div class="holo-card">
+        <div class="flex-between">
+          <div>
+            <div class="h-title" style="color:${unlocked ? 'var(--gold)' : 'var(--text-dim)'}">${e.name} (${e.year}+)</div>
+            <div class="h-desc">${e.desc} · Cruise: <strong>${e.kmh || 40} km/h</strong> · Cap: ${e.cap} · Rel: ${Math.round(e.rel * 100)}%</div>
+          </div>
+          <button class="cyber-btn ${unlocked ? 'gold' : 'dim'}" onclick="buyEngineConsist(${e.id})">
+            ${unlocked ? "Add " + money(cost) : "Year " + e.year}
+          </button>
+        </div>
+      </div>`;
+    }).join("");
+
+    body.innerHTML = `
+      <div class="holo-card">
+        <div class="h-title">Active Fleet (${state.taxis.length} / ${MAX_FLEET}) · ${sc.tariffDesc}</div>
+        <div class="h-desc">Maintain Mechanical Condition, Interior Valet Cleanliness, and Cabin Comfort to earn 5★ passenger reviews and higher tips!</div>
+      </div>
+      ${rosterHtml}
+      <div class="holo-card">
+        <div class="h-title">${sc.city} Commercial Fleet Acquisition (${sc.currencyCode})</div>
+      </div>
+      ${shopHtml}`;
+  } else if (activeTab === 2) {
+    title.textContent = `👨‍✈️ DRIVERS, EXECUTIVE MANAGERS & USER REVIEWS`;
+    const driversHtml = (state.drivers || []).map((d, idx) => {
+      const fat = Math.round(d.fatigue || 0);
+      const tCost = 340 * (d.level || 1);
+      return `<div class="holo-card">
+        <div class="flex-between">
+          <div>
+            <div class="h-title">👨‍✈️ ${d.name} · Lv${d.level || 1} (${(d.skill || 4.8).toFixed(2)} ★)</div>
+            <div class="h-desc">Assigned: Unit #${d.assignedTaxi || (idx + 1)} · Shifts Completed: ${d.trips || 0} · Fatigue: <strong style="color:${fat > 65 ? '#ff6464' : '#38f9d7'}">${fat}%</strong></div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="cyber-btn ${fat > 45 ? 'gold' : ''}" onclick="restDriver(${idx})">☕ Rest (${money(90)})</button>
+            <button class="cyber-btn ${(d.level || 1) < 3 ? 'gold' : 'dim'}" onclick="trainDriver(${idx})">
+              🎓 ${(d.level || 1) < 3 ? `Train Lv${(d.level || 1) + 1} (${money(tCost)})` : "Master ✓"}
+            </button>
+          </div>
+        </div>
+      </div>`;
+    }).join("");
+
+    const managersHtml = (state.managers || []).map((m, idx) => `
+      <div class="holo-card" style="border-color:${m.hired ? 'var(--mint)' : 'rgba(255,255,255,0.1)'}">
+        <div class="flex-between">
+          <div>
+            <div class="h-title">${m.icon} ${m.role} — <span style="color:var(--cyan)">${m.name}</span></div>
+            <div class="h-desc">${m.desc}</div>
+          </div>
+          <button class="cyber-btn ${m.hired ? 'dim' : 'gold'}" onclick="hireManager(${idx})">
+            ${m.hired ? "ACTIVE ✓" : "Recruit " + money(m.baseCost)}
+          </button>
+        </div>
+      </div>`).join("");
+
+    const reviewsHtml = (state.reviews || []).map(r => {
+      const starStr = "★".repeat(r.stars) + "☆".repeat(5 - r.stars);
+      const col = r.stars >= 5 ? "#38f9d7" : r.stars === 4 ? "#ffcb52" : "#ff6464";
+      return `<div class="holo-card">
+        <div class="flex-between">
+          <strong style="color:${col};font-size:13px">${starStr} (${r.stars}.0)</strong>
+          <span class="fleet-badge">${r.rider} · Unit #${r.unit || 1}</span>
+        </div>
+        <div class="h-desc" style="color:#f5f9ff;margin-top:5px">"${r.text}"</div>
+      </div>`;
+    }).join("");
+
+    body.innerHTML = `
+      <div class="holo-card">
+        <div class="flex-between">
+          <div>
+            <div class="h-title">Licensed Chauffeur & Driver Roster (${(state.drivers || []).length} / ${MAX_FLEET})</div>
+            <div class="h-desc">Recruit, train & rest drivers to keep passenger ratings above 4.85 ★:</div>
+          </div>
+          <button class="cyber-btn gold" onclick="recruitDriver()">+ Recruit Driver (${money(420)})</button>
+        </div>
+      </div>
+      ${driversHtml}
+      <div class="holo-card">
+        <div class="h-title">Executive Managers Recruiting Desk</div>
+        <div class="h-desc">Hire specialized directors to automate maintenance, cabin washing, HR training, AI dispatch & PR:</div>
+      </div>
+      ${managersHtml}
+      <div class="holo-card">
+        <div class="h-title">⭐ Live Verified Passenger Reviews (${state.rating.toFixed(2)} ★ Overall)</div>
+        <div class="h-desc">Real-time feedback from riders based on cabin cleanliness, AC comfort, mechanical smoothness & driver alertness:</div>
+      </div>
+      ${reviewsHtml}`;
+  } else if (activeTab === 3) {
+    title.textContent = `🛤️ ${sc.city.toUpperCase()} HUBS, CORRIDORS & FACILITIES`;
+    const stationsHtml = state.districts.map((d, i) => {
+      const minT = i === 0 ? 3 : corridorLinkMinTier(0, i);
+      const nextT = Math.min(3, minT + 1);
+      const trackCost = i === 0 ? 0 : corridorLinkCost(0, i, nextT);
+      const hasMaint = (d.facilities & FAC_MAINT) !== 0;
+      const hasLounge = (d.facilities & FAC_LOUNGE) !== 0;
+      const hasCargo = (d.facilities & FAC_CARGO) !== 0;
+      const hasCharger = (d.facilities & FAC_CHARGER) !== 0;
+
+      return `<div class="holo-card">
+        <div class="flex-between">
+          <div>
+            <div class="h-title" style="color:${d.color}">${d.name} ${d.open ? `· Lv${d.level}` : "· Locked"}</div>
+            <div class="h-desc">${d.landmark} (${d.specialty}) · GPS: ${d.lat.toFixed(3)}, ${d.lng.toFixed(3)}</div>
+          </div>
+          ${!d.open
+            ? `<button class="cyber-btn gold" onclick="unlockDistrict(${i})">Open (${money(districtPrice(i))})</button>`
+            : d.level < 3
+              ? `<button class="cyber-btn" onclick="upgradeDistrict(${i})">Lv${d.level + 1} (${money(districtUpgradePrice(i))})</button>`
+              : `<span class="fleet-badge" style="color:var(--mint)">MEGA TERMINAL</span>`
+          }
+        </div>
+        ${d.open ? `
+        <div class="btn-row">
+          ${i !== 0 && trackCost > 0 ? `<button class="cyber-btn gold" onclick="buildCorridorLink(0,${i},${nextT})">🛤️ Corridor → T${nextT} (${money(trackCost)})</button>` : ""}
+          <button class="cyber-btn ${hasMaint ? 'dim' : ''}" onclick="buildFacility(${i},${FAC_MAINT})">🔧 Service ${hasMaint ? "✓" : money(1400)}</button>
+          <button class="cyber-btn ${hasLounge ? 'dim' : ''}" onclick="buildFacility(${i},${FAC_LOUNGE})">🥂 VIP Lounge ${hasLounge ? "✓" : money(1800)}</button>
+          <button class="cyber-btn ${hasCargo ? 'dim' : ''}" onclick="buildFacility(${i},${FAC_CARGO})">📦 Parcel Hub ${hasCargo ? "✓" : money(1600)}</button>
+          <button class="cyber-btn ${hasCharger ? 'dim' : ''}" onclick="buildFacility(${i},${FAC_CHARGER})">⚡ Fast Charge ${hasCharger ? "✓" : money(2000)}</button>
+        </div>` : ""}
+      </div>`;
+    }).join("");
+
+    body.innerHTML = stationsHtml;
+  } else if (activeTab === 4) {
+    title.textContent = `📈 ${sc.city.toUpperCase()} STOCK EXCHANGE, BONDS & TARIFFS`;
+    const rivalsHtml = state.companies.map((c, i) => `
+      <div class="holo-card">
+        <div class="flex-between">
+          <div>
+            <div class="h-title" style="color:${c.color}">${c.name}</div>
+            <div class="h-desc">${c.merged ? "Acquired & Merged into your network ✓" : `Price: ${money(c.price)}/sh · Owned: ${c.owned}% · Fleet: ${c.fleet}`}</div>
+          </div>
+          ${!c.merged ? makeSparkline(c.priceHistory, c.color) : ""}
+        </div>
+        ${!c.merged ? `
+        <div class="btn-row">
+          <button class="cyber-btn" onclick="buyShares(${i}, false)">Buy 10% (${money(c.price * 10)})</button>
+          <button class="cyber-btn gold" onclick="buyShares(${i}, true)">Margin 10% (${money(c.price * 5)})</button>
+          <button class="cyber-btn dim" onclick="sellShares(${i})">Sell 10%</button>
+          <button class="cyber-btn ${c.owned >= 60 ? 'gold' : 'dim'}" onclick="mergeCompany(${i})">Takeover (${money(mergerPrice(i))})</button>
+        </div>` : ""}
+      </div>`).join("");
+
+    body.innerHTML = `
+      ${rivalsHtml}
+      <div class="holo-card">
+        <div class="h-title">Corporate Bonds & Leverage Desk (${sc.currencyCode})</div>
+        <div class="h-desc">
+          Portfolio: ${money(portfolioValue())} · Margin Debt: ${money(state.marginDebt)} · Equity: ${Math.round(equityRatio() * 100)}%<br/>
+          Active Bonds: ${state.bonds} / ${MAX_BONDS} (${money(bondDebt())}) · Restructurings: ${state.restructurings}
+        </div>
+        <div class="btn-row">
+          <button class="cyber-btn gold" onclick="issueBond()">Issue +${money(BOND_FACE)} Bond</button>
+          <button class="cyber-btn" onclick="repayBond()">Retire ${money(BOND_FACE)} Bond</button>
+          <button class="cyber-btn dim" onclick="repayMargin()">Repay Margin Debt</button>
+        </div>
+      </div>
+      <div class="holo-card">
+        <div class="h-title">Platform Tariff Model</div>
+        <div class="btn-row">
+          <button class="cyber-btn ${state.businessModel === 0 ? 'gold' : 'dim'}" onclick="setBusinessModel(0)">Commission (32%)</button>
+          <button class="cyber-btn ${state.businessModel === 1 ? 'gold' : 'dim'}" onclick="setBusinessModel(1)">Corp Surge (40% · 2014+)</button>
+          <button class="cyber-btn ${state.businessModel === 2 ? 'gold' : 'dim'}" onclick="setBusinessModel(2)">Zero-Comm Sub (2021+)</button>
+        </div>
+      </div>`;
+  } else if (activeTab === 5) {
+    title.textContent = "🌍 WORLD CITIES, DIFFICULTY MODES, CURRENCIES & CHRONICLES";
+    const df = curDiff();
+    const diffBtns = DIFFICULTY_MODES.map(m => {
+      const active = m.id === (state.difficulty ?? 2);
+      return `<button class="cyber-btn ${active ? 'gold' : 'dim'}" onclick="setDifficulty(${m.id})">${m.badge || m.name}</button>`;
+    }).join("");
+
+    const timelineHtml = sc.chronicle.map(ev => `
+      <div style="margin-top:4px;color:${year() >= ev.year ? '#fff' : 'var(--text-dim)'}">
+        • <strong>${ev.year}</strong>: ${ev.text}
+      </div>`).join("");
+
+    const worldCards = WORLD_SCENARIOS.map(w => {
+      const isCur = w.id === state.scenarioId;
+      return `<div class="holo-card" style="border-color:${isCur ? 'var(--gold)' : 'rgba(255,255,255,0.1)'}">
+        <div class="flex-between">
+          <div>
+            <div class="h-title">${w.flag} ${w.city}, ${w.country} (${w.currencySymbol} ${w.currencyCode})</div>
+            <div class="h-desc">
+              <strong style="color:var(--cyan)">${w.title}</strong><br/>
+              <span style="color:var(--gold)">${w.tariffDesc}</span><br/>
+              ${w.goalText}
+            </div>
+          </div>
+          <button class="cyber-btn ${isCur ? 'gold' : ''}" onclick="switchWorldScenario(${w.id})">
+            ${isCur ? "Restart" : "Fly Here ▸"}
+          </button>
+        </div>
+      </div>`;
+    }).join("");
+
+    body.innerHTML = `
+      <div class="holo-card" style="border-color:var(--gold)">
+        <div class="flex-between">
+          <div>
+            <div class="h-title">🎮 Gameplay Modes: Solo Quick Play · 20 Historical Scenarios · Tutorial</div>
+            <div class="h-desc">
+              Companies Owned: <strong style="color:var(--gold)">${typeof ownedCompaniesCount === "function" ? ownedCompaniesCount() : 1} / 4</strong> ·
+              Countries Established: <strong style="color:var(--mint)">${typeof countriesCount === "function" ? countriesCount() : 1} / 6</strong>
+            </div>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="cyber-btn gold" onclick="openModeModal('scenarios')">📜 20 Historical Scenarios</button>
+          <button class="cyber-btn gold" onclick="openModeModal('quickplay')">⚡ Solo Quick Play (Custom Goal)</button>
+          <button class="cyber-btn" onclick="openModeModal('tutorial')">🎓 Interactive Tutorial</button>
+          <button class="cyber-btn" onclick="openModeModal('countries')">🌐 Expand Countries (${typeof countriesCount === "function" ? countriesCount() : 1}/6)</button>
+        </div>
+      </div>
+      <div class="holo-card" style="border-color:var(--cyan)">
+        <div class="h-title">🎚️ Simulation Difficulty Mode: <span style="color:var(--gold)">${df.name.toUpperCase()}</span></div>
+        <div class="h-desc">
+          Start Capital: <strong>${Math.round(df.startCashMult * 100)}%</strong> ·
+          Fare Multiplier: <strong>${Math.round(df.fareMult * 100)}%</strong> ·
+          Wear & Fatigue: <strong>${Math.round(df.wearMult * 100)}%</strong> ·
+          Rival Pressure: <strong>${Math.round(df.rivalMult * 100)}%</strong> ·
+          Rider Patience: <strong>${df.patienceSec}s</strong>
+        </div>
+        <div class="btn-row">${diffBtns}</div>
+      </div>
+      <div class="holo-card">
+        <div class="h-title">${sc.flag} ${sc.city} (${sc.currencySymbol} ${sc.currencyCode}): ${sc.title}</div>
+        <div class="h-desc">
+          Standard Tariff: <strong style="color:var(--gold)">${sc.tariffDesc}</strong><br/>
+          Hubs Open: <strong>${openCount()} / ${sc.targetStations}</strong> · Hauls: <strong>${state.rides} / ${sc.targetRides}</strong> · Net Worth: <strong>${money(netWorth())} / ${money(sc.targetWorth)}</strong>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1)">
+            ${timelineHtml}
+          </div>
+        </div>
+      </div>
+      ${worldCards}`;
+  }
+}
+
+function refreshUI() {
+  updateHUD();
+  if (activeTab > 0) renderSheet();
+}
+
+/*
+ * REAL SLIPPY-MAP TILE RENDERER + LIVE CORRIDOR & VEHICLE OVERLAY
+ */
+function getTileImage(styleIdx, z, x, y) {
+  return loadRecoverableTile(styleIdx,z,x,y);
+}
+
+function drawMap(nowMs) {
+  const dpr = devicePixelRatio || 1;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  if (canvas.width !== Math.floor(vw * dpr) || canvas.height !== Math.floor(vh * dpr)) {
+    canvas.width = Math.floor(vw * dpr);
+    canvas.height = Math.floor(vh * dpr);
+  }
+  ctx.save();
+  ctx.scale(dpr, dpr);
+  ctx.fillStyle = "#060e1a";
+  ctx.fillRect(0, 0, vw, vh);
+
+  // 1. Draw Real Slippy Map Tiles (Google Maps / Carto Dark Matter)
+  const zInt = Math.max(3, Math.min(18, Math.floor(mapCam.zoom)));
+  const scaleFactor = Math.pow(2, mapCam.zoom - zInt);
+  const tileSize = 256 * scaleFactor;
+  const centerTileX = lng2tileX(mapCam.lng, zInt);
+  const centerTileY = lat2tileY(mapCam.lat, zInt);
+  const cols = Math.ceil(vw / tileSize) + 2;
+  const rows = Math.ceil(vh / tileSize) + 2;
+  const startX = Math.floor(centerTileX - cols / 2);
+  const startY = Math.floor(centerTileY - rows / 2);
+
+  ctx.save();
+  visibleMapTiles=[];
+  for (let tx = startX; tx <= startX + cols; tx++) {
+    for (let ty = startY; ty <= startY + rows; ty++) {
+      const sx = vw * 0.5 + (tx - centerTileX) * tileSize;
+      const sy = vh * 0.5 + (ty - centerTileY) * tileSize;
+      const img = getTileImage(mapStyleIdx, zInt, tx, ty);
+      // Only visible tiles contribute to the loading indicator.
+      if(sx<vw && sy<vh && sx+tileSize>0 && sy+tileSize>0) visibleMapTiles.push(img);
+      if (img && img.loaded) {
+        ctx.filter=img.provider.filter||'none';
+        ctx.drawImage(img, sx, sy, tileSize + 0.8, tileSize + 0.8);
+      } else {
+        ctx.filter='none';
+        // Subtle radar grid fallback while tile streams or if offline
+        ctx.strokeStyle = "rgba(0, 242, 254, 0.08)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(sx, sy, tileSize, tileSize);
+      }
+    }
+  }
+  ctx.restore();
+
+  // 2. Draw City Corridor Network Graph on Top of Real Streets
+  const sc = currentScenario();
+  for (const [u, v] of sc.corridorGraph) {
+    const du = state.districts[u], dv = state.districts[v];
+    if (!du || !dv) continue;
+    const p1 = latLngToScreen(du.lat, du.lng);
+    const p2 = latLngToScreen(dv.lat, dv.lng);
+    const tier = getEdgeTier(u, v);
+
+    if (tier > 0) {
+      ctx.save();
+      const col = tier === 3 ? "#ffcb52" : tier === 2 ? "#00f2fe" : "#38f9d7";
+      ctx.strokeStyle = col;
+      ctx.shadowColor = col;
+      ctx.shadowBlur = tier === 3 ? 14 : 8;
+      ctx.lineWidth = tier === 3 ? 5.5 : tier === 2 ? 4.0 : 2.8;
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.stroke();
+
+      // Animated directional flow dashes along built corridors
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
+      ctx.lineWidth = 1.6;
+      ctx.setLineDash([6, 12]);
+      ctx.lineDashOffset = -(nowMs / 28);
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    } else {
+      ctx.strokeStyle = "rgba(136, 164, 196, 0.30)";
+      ctx.lineWidth = 1.6;
+      ctx.setLineDash([4, 6]);
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  // 3. Draw Active Vehicle Route Highlight
+  for (const t of state.taxis) {
+    if (t.status !== PICKUP && t.status !== RIDING) continue;
+    const path = t.stationPath || [];
+    if (path.length < 2) continue;
+    ctx.save();
+    ctx.strokeStyle = t.status === RIDING ? "#38f9d7" : "#ffcb52";
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    for (let i = t.at; i < path.length; i++) {
+      const d = state.districts[path[i]];
+      const pt = latLngToScreen(d.lat, d.lng);
+      if (i === t.at) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 4. Draw Real-World District Hubs & Supply Bars
+  const pulse = (Math.sin(nowMs / 240) + 1) * 0.5;
+  state.districts.forEach((d, i) => {
+    const pt = latLngToScreen(d.lat, d.lng);
+    const cx = pt.x, cy = pt.y;
+    const waiting = state.requests.filter(r => r.from === i).length;
+
+    if (selectedHub === i) {
+      ctx.strokeStyle = "#00f2fe";
+      ctx.lineWidth = 2.8;
+      ctx.beginPath(); ctx.arc(cx, cy, 31, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (waiting > 0 && d.open) {
+      ctx.strokeStyle = d.color + "88";
+      ctx.lineWidth = 2.4;
+      ctx.beginPath(); ctx.arc(cx, cy, 20 + pulse * 12, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (d.open && d.level >= 2) {
+      ctx.strokeStyle = d.color;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.arc(cx, cy, 22, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (d.open && d.level >= 3) {
+      ctx.strokeStyle = "#ffcb52";
+      ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.arc(cx, cy, 26, 0, Math.PI * 2); ctx.stroke();
+    }
+
+    ctx.fillStyle = d.open ? d.color : "#465a73";
+    ctx.beginPath(); ctx.arc(cx, cy, 16, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#06101e";
+    ctx.beginPath(); ctx.arc(cx, cy, 10.5, 0, Math.PI * 2); ctx.fill();
+
+    ctx.fillStyle = d.open ? d.color : "#88a4c4";
+    ctx.font = "900 11.5px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(d.open ? (d.level > 1 ? "L" + d.level : String(i + 1)) : "+", cx, cy + 0.5);
+
+    // Supply bars next to open hubs
+    if (d.open && d.supply) {
+      for (let k = 0; k < 4; k++) {
+        const sCount = Math.min(6, d.supply[k] || 0);
+        if (sCount > 0) {
+          ctx.fillStyle = KIND_COLORS[k];
+          ctx.fillRect(cx - 24, cy - 11 + k * 5.5, sCount * 2.5, 3.8);
+        }
+      }
+    }
+
+    // Real Place Name Pill
+    ctx.font = "800 11px sans-serif";
+    const facIcons = (d.facilities & FAC_MAINT ? "🔧" : "") + (d.facilities & FAC_LOUNGE ? "🥂" : "") + (d.facilities & FAC_CARGO ? "📦" : "") + (d.facilities & FAC_CHARGER ? "⚡" : "");
+    const labelStr = d.name + (facIcons ? " " + facIcons : "");
+    const tw = ctx.measureText(labelStr).width + 14;
+    ctx.fillStyle = "rgba(5, 12, 24, 0.92)";
+    ctx.strokeStyle = d.open ? d.color + "77" : "rgba(255,255,255,0.15)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.roundRect(cx - tw / 2, cy + 19, tw, 19, 6); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#f5f9ff";
+    ctx.fillText(labelStr, cx, cy + 29);
+
+    if (waiting > 0) {
+      ctx.fillStyle = "#ffcb52";
+      ctx.beginPath(); ctx.arc(cx + 14, cy - 14, 9, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#050d1a";
+      ctx.font = "900 10px sans-serif";
+      ctx.fillText(String(waiting), cx + 14, cy - 13.5);
+    }
+  });
+
+  // 5. Draw Rival Vehicles on Real Map
+  for (const r of state.companies) {
+    if (r.merged) continue;
+    const da = state.districts[r.fromStation || 0] || state.districts[0];
+    const db = state.districts[r.toStation || 1] || da;
+    const lat = da.lat + (db.lat - da.lat) * (r.progress || 0);
+    const lng = da.lng + (db.lng - da.lng) * (r.progress || 0);
+    const p1 = latLngToScreen(da.lat, da.lng);
+    const p2 = latLngToScreen(db.lat, db.lng);
+    const pt = latLngToScreen(lat, lng);
+    ctx.save();
+    ctx.translate(pt.x, pt.y);
+    ctx.rotate(Math.atan2(p2.y - p1.y, p2.x - p1.x));
+    ctx.fillStyle = r.color;
+    ctx.beginPath(); ctx.roundRect(-10, -5, 20, 10, 3.5); ctx.fill();
+    ctx.fillStyle = "#06101e";
+    ctx.fillRect(-3.5, -3.5, 7, 7);
+    ctx.restore();
+  }
+
+  // 6. Draw Player Fleet Vehicles on Real Map
+  for (const t of state.taxis) {
+    const pos = getTaxiLatLng(t);
+    const pt = latLngToScreen(pos.lat, pos.lng);
+    const path = t.stationPath || [t.station || 0];
+    const aIdx = path[Math.min(t.at || 0, path.length - 1)];
+    const bIdx = path[Math.min((t.at || 0) + 1, path.length - 1)];
+    const p1 = latLngToScreen(state.districts[aIdx].lat, state.districts[aIdx].lng);
+    const p2 = latLngToScreen(state.districts[bIdx].lat, state.districts[bIdx].lng);
+
+    ctx.save();
+    ctx.translate(pt.x, pt.y);
+    if (aIdx !== bIdx) ctx.rotate(Math.atan2(p2.y - p1.y, p2.x - p1.x));
+
+    const col = t.broken ? "#ff6464" : t.status === RIDING ? "#38f9d7" : t.status === CHARGING ? "#a97aff" : "#ffcb52";
+    ctx.shadowColor = col;
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.roundRect(-12.5, -6.5, 25, 13, 5); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#06101e";
+    ctx.beginPath(); ctx.roundRect(-4.5, -4.5, 9.5, 9, 2.5); ctx.fill();
+    ctx.restore();
+  }
+
+  // 7. Floating Fare Popups at Real Lat/Lng
+  floaterTexts = floaterTexts.filter(f => f.life > 0);
+  for (const f of floaterTexts) {
+    const pt = latLngToScreen(f.lat, f.lng);
+    const fy = pt.y - (1 - f.life) * 34 - 22;
+    ctx.globalAlpha = Math.min(1, f.life * 1.4);
+    ctx.font = "900 13px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillStyle = f.color;
+    ctx.fillText(f.text, pt.x, fy);
+    ctx.globalAlpha = 1;
+    f.life -= 0.02;
+  }
+
+  ctx.restore();
+}
+
+loadState();
+resetCamera();
+updateHUD();
+
+let lastFrame = performance.now();
+let hudTimer = 0;
+function loop(now) {
+  const dt = (now - lastFrame) / 1000;
+  lastFrame = now;
+  tickSimulation(dt);
+  drawMap(now);
+  hudTimer += dt;
+  if (hudTimer > 0.25) {
+    hudTimer = 0;
+    updateHUD();
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

@@ -1,6 +1,4 @@
 .build/
-dist/
-*.apk
 *.aab
 *.idsig
 *.p12

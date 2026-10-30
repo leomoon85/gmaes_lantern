@@ -1,6 +1,8 @@
 # Native Android release candidate
 
-Fareforge version `1.0.0-rc2`, code `6`. Application ID `com.lantern.dispatch`; debug builds append `.dev`. Minimum API 26, target/compile API 36. This is a native Android game with MapLibre/OpenFreeMap street maps and an offline schematic fallback. The package identity stays unchanged to support native save/update compatibility.
+Fareforge version `1.0.0-rc3`, code `7`. Application ID `com.lantern.dispatch`; debug builds append `.dev`. Minimum API 26, target/compile API 36. This is a native Android game with MapLibre/OpenFreeMap street maps and an offline schematic fallback. The package identity stays unchanged to support native save/update compatibility.
+
+RC3 adds an original bundled soundtrack with independent music/button-sound settings, foreground-only looping, audio-focus handling, and headphone-disconnect pausing. Music settings persist across activity recreation. Audible playback, level, and loop continuity still require physical-device listening checks. The code-review findings from RC2 are not fixed by this audio update.
 
 ## Release build
 
@@ -15,10 +17,10 @@ Fareforge version `1.0.0-rc2`, code `6`. Application ID `com.lantern.dispatch`; 
 
 ## Verification available in this repository
 
-Fareforge validation: engine/save suites and eight Android JVM tests passed; optimized release APK and AAB builds passed; Android lint has zero errors and two build-tool update notices. Both 64-bit MapLibre native libraries have 16 KB ELF load alignment. Live OpenFreeMap style endpoints were checked, but actual GPU-backed street rendering cannot be exercised on this host: the Android emulator lacks a hypervisor driver. JVM UI previews show the offline fallback, not verified live street tiles. Production signing and physical-device map/lifecycle testing remain release gates. CI is supplied as a template because the available token cannot create workflow files.
+Fareforge validation: engine/save suites and twelve Android JVM tests passed; optimized release APK and AAB builds passed; Android lint has zero errors and two build-tool update notices. Both 64-bit MapLibre native libraries have 16 KB ELF load alignment. Live OpenFreeMap style endpoints were checked, but actual GPU-backed street rendering cannot be exercised on this host: the Android emulator lacks a hypervisor driver. JVM UI previews show the offline fallback, not verified live street tiles. Production signing and physical-device map/lifecycle testing remain release gates. CI is supplied as a template because the available token cannot create workflow files.
 
 - `engineTest`: routing, dispatch, accounting, share/margin operations, debt, models, all campaign objectives, route policies, Academy gating, and save corruption/roundtrip checks.
-- `testDebugUnitTest`: Android Views, offline Canvas drawing, navigation, newspaper pause/resume, historical date/region filters, and atomic native save operations, using Robolectric.
+- `testDebugUnitTest`: Android Views, offline Canvas drawing, navigation, newspaper pause/resume, historical date/region filters, atomic native saves, and music mute/persistence, looping, pause/resume, focus denial/interruption, ducking, headphone disconnection, and player cleanup, using Robolectric.
 - `lintDebug` and release lint run with errors blocking the build. No error baseline hides findings.
 - `verify-native.ps1`: verifies that the APK contains the native dataset and no browser assets or WebView references.
 - The CI template builds debug/release APKs and an unsigned release bundle, runs tests/lint, and retains build/test reports. To enable it, a repository owner must install `ci/android-workflow.yml` as `.github/workflows/android.yml` using an account/token authorized to update workflows.

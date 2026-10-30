@@ -23,6 +23,8 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
   Game game;
   NativeNews news;
   private SaveStore saves;
+  private BackgroundMusic soundtrack;
+  private boolean music = true;
   private static final ExecutorService DISK =
       Executors.newSingleThreadExecutor(
           task -> {
@@ -86,6 +88,9 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
     getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     night = getPreferences(0).getBoolean("night", true);
     sound = getPreferences(0).getBoolean("sound", true);
+    music = getPreferences(0).getBoolean("music", sound);
+    soundtrack = new BackgroundMusic(this, music);
+    setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC);
     saves = new SaveStore(this);
     boolean restored = false;
     try {
@@ -154,6 +159,7 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
   @Override
   protected void onResume() {
     super.onResume();
+    soundtrack.resume();
     if (map != null) map.resume();
     foreground = true;
     main.removeCallbacks(pausedFrameTick);
@@ -164,6 +170,7 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
 
   @Override
   protected void onPause() {
+    soundtrack.pause();
     if (map != null) map.pause();
     foreground = false;
     main.removeCallbacks(pausedFrameTick);
@@ -201,6 +208,7 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
 
   @Override
   protected void onDestroy() {
+    soundtrack.close();
     closed = true;
     Choreographer.getInstance().removeFrameCallback(this);
     main.removeCallbacksAndMessages(null);
@@ -869,7 +877,17 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
             }));
     page.addView(
         button(
-            sound ? "Sound on · tap to mute" : "Sound off · tap to enable",
+            music ? "Music on · tap to mute" : "Music off · tap to enable",
+            () -> {
+              music = !music;
+              soundtrack.setEnabled(music);
+              getPreferences(0).edit().putBoolean("music", music).apply();
+              dismissCurrent();
+              showHome(canContinue);
+            }));
+    page.addView(
+        button(
+            sound ? "Button sounds on · tap to mute" : "Button sounds off · tap to enable",
             () -> {
               sound = !sound;
               getPreferences(0).edit().putBoolean("sound", sound).apply();

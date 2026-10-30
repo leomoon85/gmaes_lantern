@@ -4,6 +4,8 @@ A native Android management game about turning one vehicle into a mobility compa
 
 The Fareforge redesign adds a midnight/amber identity, an illustrated start screen, original icon navigation, floating chapter objectives, live dispatch cards with patience indicators, and full-screen phone management panels. The application ID and native save format retain their previous identities so existing native progress can survive an update signed with the same certificate.
 
+An original 40-second instrumental soundtrack, **City Evening**, loops offline in menus and gameplay. The menu has separate **Music** and **Button sounds** controls that remember their settings. Music pauses when the app leaves the foreground, respects Android audio focus, and pauses if headphones disconnect. Device media volume controls the soundtrack. Regenerate the bundled recording with `node tools/generate-music.cjs`.
+
 ### Free maps, without billing setup
 
 MapLibre Native is the on-device renderer; OpenFreeMap supplies real street data/styles based on OpenStreetMap. The provider currently offers its public instance free without accounts or API keys. No Google Cloud project, Google API key, or billing account is required. Online street maps require internet and depend on the provider's availability. Copyright attribution is retained. The game does not implement bulk offline map downloads or turn-by-turn road navigation; drawn service corridors and vehicle movement are gameplay abstractions between geographic city hubs. Use **Streets** to retry or switch map mode, and **Fit city** to reset the camera. See [OpenFreeMap](https://openfreemap.org/) and its [mobile-app instructions](https://openfreemap.org/quick_start/).

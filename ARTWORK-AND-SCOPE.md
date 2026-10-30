@@ -7,6 +7,7 @@
 - `res/drawable/ic_launcher.xml`: newly drawn vector cab icon.
 - Text: newly written game copy and paraphrased historical context; no extracted dialogue or campaign scripts.
 - UI fonts: Android system fonts. Street-map styles/glyphs come from the map provider.
+- Music: original instrumental loop "City Evening", synthesized from notes in `tools/generate-music.cjs` into `res/raw/city_evening.wav`. No third-party music or samples. Bundled for offline playback.
 - Libraries: Android/Java APIs and the open-source MapLibre Native Android SDK; no commercial game-engine assets or proprietary map API keys.
 - Fareforge identity: original code-drawn city illustration, navigation icons, and launcher monogram. The display name changes while the Android package/save identity remains compatible.
 - Original PC archive: no files copied into this game or its source distribution.

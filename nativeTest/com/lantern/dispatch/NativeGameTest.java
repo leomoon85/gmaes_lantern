@@ -25,6 +25,8 @@ public class NativeGameTest {
 
   @Before
   public void start() {
+    org.robolectric.shadows.ShadowMediaPlayer.setMediaInfoProvider(
+        source -> new org.robolectric.shadows.ShadowMediaPlayer.MediaInfo(40000, 0));
     ShadowChoreographer.setPaused(true);
     controller = Robolectric.buildActivity(MainActivity.class).setup();
     activity = controller.get();
@@ -183,6 +185,21 @@ public class NativeGameTest {
     assertNotNull(find(activity.getWindow().getDecorView(), "Goals"));
     activity.selectTab(4);
     screenshot("native-landscape-market", 915, 412);
+  }
+
+  @Test
+  public void musicTogglePersistsIndependentlyOfButtonSounds() {
+    dialogButton("Music on").performClick();
+    assertNotNull(dialogButton("Music off"));
+    assertFalse(activity.getPreferences(0).getBoolean("music", true));
+    assertNotNull(dialogButton("Button sounds on"));
+    android.os.Bundle snapshot = new android.os.Bundle();
+    controller.saveInstanceState(snapshot).pause().stop().destroy();
+    controller =
+        Robolectric.buildActivity(MainActivity.class).create(snapshot).start().resume().visible();
+    activity = controller.get();
+    assertNotNull(dialogButton("Music off"));
+    assertNotNull(dialogButton("Button sounds on"));
   }
 
   @Test

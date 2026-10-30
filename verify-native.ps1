@@ -1,4 +1,4 @@
-param([string]$Apk = (Join-Path $PSScriptRoot 'dist\Lantern-Dispatch.apk'))
+param([string]$Apk = (Join-Path $PSScriptRoot 'dist\Fareforge.apk'))
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $archive=[IO.Compression.ZipFile]::OpenRead([IO.Path]::GetFullPath($Apk))

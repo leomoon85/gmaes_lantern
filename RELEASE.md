@@ -1,6 +1,6 @@
 # Native Android release candidate
 
-Version `1.0.0-rc1`, code `5`. Application ID `com.lantern.dispatch`; debug builds append `.dev`. Minimum API 26, target/compile API 36. The Android app has no WebView or remote asset dependency.
+Fareforge version `1.0.0-rc2`, code `6`. Application ID `com.lantern.dispatch`; debug builds append `.dev`. Minimum API 26, target/compile API 36. This is a native Android game with MapLibre/OpenFreeMap street maps and an offline schematic fallback. The package identity stays unchanged to support native save/update compatibility.
 
 ## Release build
 
@@ -15,7 +15,7 @@ Version `1.0.0-rc1`, code `5`. Application ID `com.lantern.dispatch`; debug buil
 
 ## Verification available in this repository
 
-Local validation on 30 October 2026: engine/save suites passed, all six Robolectric Android tests passed, debug/release APKs and the release AAB built, and the development APK signature and native-only package check passed. Android lint reported no issues (zero errors and warnings). The release bundle is unsigned because no publisher upload key was supplied. A CI template is included at `ci/android-workflow.yml`; the current GitHub token cannot create workflow files, so CI is not enabled or claimed as passing remotely.
+Fareforge validation: engine/save suites and eight Android JVM tests passed; optimized release APK and AAB builds passed; Android lint has zero errors and two build-tool update notices. Both 64-bit MapLibre native libraries have 16 KB ELF load alignment. Live OpenFreeMap style endpoints were checked, but actual GPU-backed street rendering cannot be exercised on this host: the Android emulator lacks a hypervisor driver. JVM UI previews show the offline fallback, not verified live street tiles. Production signing and physical-device map/lifecycle testing remain release gates. CI is supplied as a template because the available token cannot create workflow files.
 
 - `engineTest`: routing, dispatch, accounting, share/margin operations, debt, models, all campaign objectives, route policies, Academy gating, and save corruption/roundtrip checks.
 - `testDebugUnitTest`: Android Views, offline Canvas drawing, navigation, newspaper pause/resume, historical date/region filters, and atomic native save operations, using Robolectric.

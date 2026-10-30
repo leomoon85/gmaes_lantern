@@ -1,6 +1,12 @@
-# Lantern Dispatch — Native Android
+# Fareforge — Mobility Tycoon
 
-An offline Android management game about turning one vehicle into a mobility company. The active game uses **Java, Android Views, and a Canvas-rendered city**, with no WebView, JavaScript runtime, remote map tiles, or third-party runtime libraries. Android 8.0+ is supported; the build targets Android 16 / API 36.
+A native Android management game about turning one vehicle into a mobility company. The active game uses Java, Android Views, and **MapLibre Native with OpenFreeMap street maps**. There is no WebView or browser game. Android 8.0+ is supported; the build targets Android 16 / API 36. The original offline city stays playable when internet or the street renderer is unavailable.
+
+The Fareforge redesign adds a midnight/amber identity, an illustrated start screen, original icon navigation, floating chapter objectives, live dispatch cards with patience indicators, and full-screen phone management panels. The application ID and native save format retain their previous identities so existing native progress can survive an update signed with the same certificate.
+
+### Free maps, without billing setup
+
+MapLibre Native is the on-device renderer; OpenFreeMap supplies real street data/styles based on OpenStreetMap. The provider currently offers its public instance free without accounts or API keys. No Google Cloud project, Google API key, or billing account is required. Online street maps require internet and depend on the provider's availability. Copyright attribution is retained. The game does not implement bulk offline map downloads or turn-by-turn road navigation; drawn service corridors and vehicle movement are gameplay abstractions between geographic city hubs. Use **Streets** to retry or switch map mode, and **Fit city** to reset the camera. See [OpenFreeMap](https://openfreemap.org/) and its [mobile-app instructions](https://openfreemap.org/quick_start/).
 
 The earlier browser prototype is retained in `legacy-web/` for reference and is excluded from Android packaging. Its saved campaigns use a different format and are not migrated into the native edition. Keep the old installation/data if that progress matters.
 
@@ -12,13 +18,13 @@ The earlier browser prototype is retained in `legacy-web/` for reference and is 
 - Open and upgrade hubs; build express corridors, depots, lounges, parcel terminals, and charging stations.
 - Hire/train/rest partners and hire managers. Training, fatigue, maintenance, dispatch management, and service quality affect operations.
 - Trade fictional rival shares, manage margin and bonds, acquire companies, and open international branches.
-- Read the native Lantern Ledger for sourced historical events, dated real share-price observations, and company alerts. Editions and management screens pause simulation; the selected speed resumes when you return to the city.
+- Read The Mobility Post for sourced historical events, dated real share-price observations, and company alerts. Editions and management screens pause simulation; the selected speed resumes when you return to the city.
 
-The city maps are original **offline schematics**, not geographic street maps. Real place names provide context. Game money and rival companies are fictional. UI text is currently English; the earlier prototype's language selector is not represented as native localization.
+The fallback map is an original offline schematic. Online maps use real geographic hub locations; the game economy, rivals, and operating corridors are fictional. UI text is English; the earlier prototype's language selector is not represented as native localization.
 
 ## Install a development build
 
-`dist/Lantern-Dispatch.apk` is the locally signed native development APK. It retains the package and development signing key used by the earlier manual build, when that local key is available. It is suitable for local installation and testing, not a Play production upload.
+`dist/Fareforge.apk` is the locally signed development APK. It retains the package and local development signing key from the earlier native edition. It is suitable for installation and testing, not a Play production upload.
 
 The Gradle debug APK has a separate application ID (`com.lantern.dispatch.dev`) so it can coexist with the development-signed manual build.
 
@@ -44,13 +50,13 @@ $env:LANTERN_KEY_ALIAS = 'upload'
 
 The package name, version code, signing identity, and any existing Play listing must be reviewed before upload. The bundled development certificate is not a production credential.
 
-## Build without Gradle downloads
+## Build an installable development APK
 
-The manual build uses installed JDK 17, platform 36, and build-tools 35.0.0. It runs Java engine/save tests, packages **only `native-assets/`**, compiles native sources, aligns, signs with the local development key, and verifies the APK:
+`build.ps1` uses Gradle so MapLibre and its Android dependencies are packaged correctly. It runs the engine/save tests and lint, builds an optimized release APK, then signs it with the local development key. Use JDK 17, platform 36, and build-tools 35.0.0. Initial dependency resolution requires internet; use `-Offline` after dependencies are cached.
 
 ```powershell
 .\build.ps1 -Sdk 'C:\path\to\Android\Sdk' -Java 'C:\path\to\jdk-17'
-.\verify-native.ps1 -Apk '.\dist\Lantern-Dispatch.apk'
+.\verify-native.ps1 -Apk '.\dist\Fareforge.apk'
 ```
 
 `verify-native.ps1` rejects APKs containing HTML/JS/CSS assets or WebView runtime references. It also validates the historical dataset packaged in the APK.
@@ -65,4 +71,4 @@ The manual build uses installed JDK 17, platform 36, and build-tools 35.0.0. It 
 
 This is a **native release candidate**, not a certified store release. See [RELEASE.md](RELEASE.md) for validation results and remaining gates. Tests include simulation/accounting scenarios, all campaign objective checks, six-city save roundtrips, corrupted-save rejection, and Android UI/lifecycle tests using Robolectric. Runtime Android test previews, when generated, live in `build/native-previews/` and are not physical-device screenshots.
 
-The app requests no Android permissions, includes no analytics/ads/purchases, and makes no network requests itself. Source links open the user's browser. See [PRIVACY.md](PRIVACY.md).
+Street maps use normal network permissions, with no GPS/location permission. There are no ads, purchases, or analytics. Map requests go to the map provider; campaign state stays on the device. Source links open the user's browser. See [PRIVACY.md](PRIVACY.md).

@@ -152,6 +152,16 @@ public class NativeGameTest {
     tutorial();
     activity.game.cash = 87654;
     activity.game.chapter = 2;
+    activity.game.reports.add(
+        new Game.Report(
+            "old-brand",
+            "2013-10-02",
+            "Lantern report",
+            "Lantern earned a fare.",
+            "Lantern ledger",
+            "",
+            "Lantern desk",
+            "Your campaign"));
     activity.selectTab(1);
     android.os.Bundle snapshot = new android.os.Bundle();
     controller.saveInstanceState(snapshot).pause().stop().destroy();
@@ -160,6 +170,7 @@ public class NativeGameTest {
     activity = controller.get();
     assertEquals(87654, activity.game.cash);
     assertEquals(2, activity.game.chapter);
+    assertEquals("Fareforge report", activity.game.reports.get(0).title);
     assertNotNull(find(activity.getWindow().getDecorView(), "Buy vehicle"));
   }
 
@@ -172,6 +183,30 @@ public class NativeGameTest {
     assertNotNull(find(activity.getWindow().getDecorView(), "Goals"));
     activity.selectTab(4);
     screenshot("native-landscape-market", 915, 412);
+  }
+
+  @Test
+  public void realCityAnchorsMatchHubCoordinates() {
+    for (int city = 0; city < 6; city++) {
+      Game g = new Game(city);
+      for (int i = 0; i < 6; i++) {
+        double[] point = CityGeography.hub(city, i);
+        double[] mapped =
+            CityGeography.position(city, g.districts.get(i).cell(), g.districts.get(i).cell(), 0);
+        assertArrayEquals(point, mapped, .000001);
+      }
+    }
+  }
+
+  @Test
+  public void mapControlsKeepOfflineGamePlayable() {
+    tutorial();
+    activity.map.toggleStreets();
+    assertFalse(activity.map.isUsingStreets());
+    assertTrue(activity.map.status().contains("Offline"));
+    activity.game.autoDispatch = true;
+    for (int i = 0; i < 120; i++) activity.game.tick(.2);
+    assertTrue(activity.game.rides > 0);
   }
 
   private boolean containsBrowser(View view) {

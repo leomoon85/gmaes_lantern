@@ -1,6 +1,8 @@
-# Lantern Dispatch native edition — privacy
+# Fareforge — privacy
 
-The native game stores campaign progress and local settings in the application's private storage on the device. It does not send that information to a server. It requests no Android permissions and includes no analytics, advertising SDK, account system, purchases, or location collection.
+The native game stores campaign progress and settings in the application's private storage. Company finances, trips, and saves are not uploaded. The app includes no advertising SDK, accounts, purchases, or analytics service. It does not request device location permission or use the device's GPS location.
+
+Street maps use MapLibre Native and OpenFreeMap. The app requests the normal INTERNET and ACCESS_NETWORK_STATE permissions. When online street maps are used, the provider receives ordinary network requests, including the requested map area and network metadata such as IP address. Styles and fonts may also be requested from the map provider. Attribution remains visible in the native map. See [OpenFreeMap](https://openfreemap.org/) and [MapLibre](https://maplibre.org/). The original offline city remains playable if online maps cannot load. No API key, billing account, or player registration is needed for the selected map provider.
 
 Historical event and price records are bundled with the app. Choosing an original-source link opens the device's browser; that external website's privacy practices then apply. The game does not embed those websites.
 

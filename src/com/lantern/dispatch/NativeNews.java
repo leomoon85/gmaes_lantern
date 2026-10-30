@@ -98,26 +98,26 @@ final class NativeNews {
               "opening",
               today,
               "A new name on the city streets",
-              "Lantern has entered "
+              "Fareforge has entered "
                   + game.currentScenario().city
                   + ". A single vehicle is the beginning of a network.",
               "Serve your first trips, improve the service, then connect another hub. Your"
                   + " company’s journey is yours to shape.",
               "",
-              "Lantern company desk",
+              "Fareforge company desk",
               "Your campaign"));
     if (game.marginCalls > 0)
       financial(
           game,
           "margin-" + game.marginCalls,
-          "Broker liquidates Lantern’s shares",
+          "Broker liquidates Fareforge’s shares",
           "Your portfolio fell below the margin equity requirement. The shares were sold to settle"
               + " borrowing.");
     if (game.restructurings > 0)
       financial(
           game,
           "restructure-" + game.restructurings,
-          "Lantern enters emergency restructuring",
+          "Fareforge enters emergency restructuring",
           "Creditors intervened after your operating cash fell too far. Review costs and debt"
               + " before expanding.");
     for (Game.Company company : game.companies)
@@ -125,7 +125,7 @@ final class NativeNews {
         financial(
             game,
             "merger-" + company.name,
-            "Lantern acquires " + company.name,
+            "Fareforge acquires " + company.name,
             "The rival’s available fleet, treasury, and hub have been integrated into your"
                 + " company.");
     if (game.scenarioWon)

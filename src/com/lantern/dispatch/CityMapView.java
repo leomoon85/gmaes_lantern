@@ -140,9 +140,9 @@ final class CityMapView extends View {
   protected void onDraw(Canvas canvas) {
     super.onDraw(canvas);
     if (game == null) return;
-    int ground = night ? 0xff142923 : 0xffdce2cf,
-        block = night ? 0xff203b31 : 0xffcad4bf,
-        road = night ? 0xff456052 : 0xffa9b6a0;
+    int ground = night ? 0xff0d192b : 0xffdde4e9,
+        block = night ? 0xff1a2b43 : 0xffcad4df,
+        road = night ? 0xff3c5269 : 0xffa1b3c4;
     canvas.drawColor(ground);
     float density = getResources().getDisplayMetrics().density;
     unit = Math.min(getWidth() / (float) Game.W, getHeight() / (float) Game.H) * .94f;
@@ -157,8 +157,8 @@ final class CityMapView extends View {
         if (Game.road(x, y)) continue;
         int color =
             Game.water(x, y)
-                ? (night ? 0xff234d4b : 0xff9abdbc)
-                : Game.park(x, y) ? (night ? 0xff2e5540 : 0xffb0c7a0) : block;
+                ? (night ? 0xff173b56 : 0xff9abdbc)
+                : Game.park(x, y) ? (night ? 0xff20404b : 0xffb0c7a0) : block;
         fill(color);
         rect.set(
             x * unit + unit * .10f,
@@ -167,7 +167,7 @@ final class CityMapView extends View {
             (y + 1) * unit - unit * .10f);
         canvas.drawRoundRect(rect, unit * .15f, unit * .15f, paint);
         if (!Game.water(x, y) && !Game.park(x, y) && (x + y) % 3 == 0) {
-          fill(night ? 0xff294638 : 0xffbdcbb4);
+          fill(night ? 0xff243951 : 0xffbdcbb4);
           canvas.drawRect(
               x * unit + .3f * unit,
               y * unit + .2f * unit,
@@ -220,7 +220,7 @@ final class CityMapView extends View {
     for (int i = 0; i < game.districts.size(); i++) {
       Game.District hub = game.districts.get(i);
       float x = cellX(hub.cell()), y = cellY(hub.cell());
-      fill(night ? 0xff10271f : 0xffeff1df);
+      fill(night ? 0xff0b1526 : 0xffeff1df);
       canvas.drawCircle(x, y, unit * .92f, paint);
       paint.setColor(hub.open ? hub.color : 0xff74897e);
       paint.setStyle(Paint.Style.STROKE);
@@ -242,7 +242,7 @@ final class CityMapView extends View {
       float x = screenX(hub.cell()), y = screenY(hub.cell()) + unit * zoom + 14 * density;
       float width = paint.measureText(name) + 14 * density;
       x = Math.max(width / 2 + 3, Math.min(getWidth() - width / 2 - 3, x));
-      fill(night ? 0xdd12271f : 0xeef0efdf);
+      fill(night ? 0xee101d30 : 0xeef0efdf);
       rect.set(x - width / 2, y - 12 * density, x + width / 2, y + 5 * density);
       canvas.drawRoundRect(rect, 5 * density, 5 * density, paint);
       fill(night ? 0xffe3ead7 : 0xff263e30);
@@ -250,7 +250,7 @@ final class CityMapView extends View {
     }
     paint.setTextAlign(Paint.Align.LEFT);
     paint.setTextSize(10 * density);
-    fill(night ? 0xffb1c1ae : 0xff48614d);
+    fill(night ? 0xff9caec4 : 0xff48614d);
     canvas.drawText(
         "ORIGINAL CITY SCHEMATIC  ·  OFFLINE", 14 * density, getHeight() - 12 * density, paint);
   }

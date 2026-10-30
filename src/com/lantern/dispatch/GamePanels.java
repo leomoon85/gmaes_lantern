@@ -321,7 +321,7 @@ final class GamePanels {
               parent,
               c.name,
               c.merged
-                  ? "Acquired by Lantern"
+                  ? "Acquired by Fareforge"
                   : Game.money(c.price)
                       + " / share · "
                       + c.owned
@@ -380,7 +380,7 @@ final class GamePanels {
   private void news(LinearLayout parent) {
     ui.card(
         parent,
-        "The Lantern Ledger",
+        "The Mobility Post",
         "Historical events, dated share observations, and the story of your company. Reading an"
             + " edition pauses play.");
     if (g().reports.isEmpty())

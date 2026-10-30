@@ -757,8 +757,7 @@ public final class Game implements java.io.Serializable {
     setDifficulty(DIFF_EASIEST);
     loadScenario(0);
     this.cash = 18000;
-    this.message =
-        "Tutorial Step 1/8: Welcome to Lantern Tycoon Academy! Dispatch your first waiting ride.";
+    this.message = "Welcome to Fareforge Academy. Dispatch your first waiting trip.";
   }
 
   public boolean advanceTutorial() {

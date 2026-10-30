@@ -2,6 +2,8 @@
 
 - `Game.java`: newly written simulation, generated road grid and fictional operating rules.
 - `MainActivity.java`: newly written Android interface and vector drawing commands.
+- Native edition: `CityMapView.java` draws the original offline city schematic; `GamePanels.java` supplies native Android controls. No web map or third-party game runtime is bundled.
+- `native-assets/history.json`: paraphrased historical records and selected numerical share-price observations with source URLs; see `HISTORICAL-NOTES.md`.
 - `res/drawable/ic_launcher.xml`: newly drawn vector cab icon.
 - Text: newly written game copy and paraphrased historical context; no extracted dialogue or campaign scripts.
 - Fonts: system Android sans-serif only; no font files redistributed.

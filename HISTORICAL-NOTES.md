@@ -1,36 +1,40 @@
-# Historical context and invented simulation effects
+# Historical records in the native Android edition
 
-## Current WebView newspaper dataset
+The authoritative bundled dataset is native-assets/history.json. Historical reporting is paraphrased and attributed; simulation outcomes and rival prices remain fictional. Event dates and later publication dates are stored separately. The native campaign clock unlocks records by publication date when supplied.
 
-The current implementation uses `assets/history-data.js` as the source of truth for 14 sourced historical event records and 11 selected historical share-price observations. Each record includes its event/observation date and a source URL. Publication dates are recorded separately for retrospective reports. The newspaper unlocks records by campaign date; the city timeline uses this dataset instead of its older embedded headlines.
+## News sources
 
-Real companies may be named in historical reporting. The playable rivals remain fictional. Historical quotes are reference observations in USD, not tradable rival prices, not live quotes, and not a full daily series. The dataset includes Lyft's US$72 IPO offer and Uber's US$45 IPO offer, eight Lyft quarter-end closes through March 2021, and Uber's December 2020 quarter-end close. Quote types remain distinct. The bank pricing supplements reproduce historical market tables and can reflect corporate-action adjustments; SEC hosting is not an endorsement or independent validation by the SEC.
+- 2011-05-04 — Uber marks the start of its New York service · [Uber newsroom · 4 May 2011](https://www.uber.com/us/en/newsroom/celebrating-ubers-nyc-launch/)
+- 2012-06-14 — Early Uber riders appear in London · [Uber blog · 14 June 2012](https://www.uber.com/gb/en/blog/secret-ubers-spotted-in-london/)
+- 2013-10-02 — Uber formally launches in Bengaluru · [Uber newsroom · 2 October 2013](https://www.uber.com/in/en/newsroom/namma-bengaluru-namma-uber-were-officially-in-bangalore/)
+- 2017-09-22 — TfL declines to renew Uber’s London licence · [London Assembly · TfL decision, 22 September 2017](https://www.london.gov.uk/who-we-are/what-london-assembly-does/questions-mayor/find-an-answer/taxi-and-private-hire-trade-3-3)
+- 2017-10-23 — Toyota launches the JPN Taxi · [Toyota · JPN Taxi launch announcement](https://global.toyota/en/mediatour2017_tokyoms/pre-show/jpntaxi/)
+- 2018-03-26 — Grab acquires Uber’s Southeast Asian business · [Singapore competition regulator · 24 September 2018](https://www.ccs.gov.sg/media-and-events/newsroom/announcements-and-media-releases/grab-uber-merger--cccs-imposes-directions-on-parties-to-restore-market-contestability-and-penalties-to-deter-anti-competitive-mergers/) · Published 2018-09-24
+- 2019-03-28 — Lyft prices its IPO at US$72 a share · [Lyft prospectus · SEC filing, 28 March 2019](https://www.sec.gov/Archives/edgar/data/1759509/000119312519091446/d721841d424b4.htm)
+- 2019-05-09 — Uber sets US$45 IPO price · [Uber investor relations · 9 May 2019](https://investor.uber.com/news-events/news/press-release-details/2019/Uber-Announces-Pricing-of-Initial-Public-Offering/default.aspx)
+- 2020-03-24 — India announces a nationwide lockdown · [Press Information Bureau · 24 March 2020](https://www.pib.gov.in/PressReleaseIframePage.aspx?PRID=1607997&lang=2&reg=48)
+- 2020-09-01 — JapanTaxi and MOV give way to GO · [GO launch announcement · 1 September 2020](https://go.goinc.jp/news/1)
+- 2021-02-10 — Uber reports a divided pandemic year · [Uber · Q4 and full-year 2020 results, 10 February 2021](https://investor.uber.com/news-events/news/press-release-details/2021/Uber-Announces-Results-for-Fourth-Quarter-and-Full-Year-2020/default.aspx)
+- 2022-11-01 — Namma Yatri launches in Bengaluru · [The Indian Express · 8 November 2022](https://indianexpress.com/article/cities/bangalore/passengers-sceptical-bengaluru-auto-drivers-union-launches-ride-app-8257090/) · Published 2022-11-08
+- 2023-08-10 — San Francisco expands paid driverless service · [CPUC · 10 August 2023](https://www.cpuc.ca.gov/news-and-updates/all-news/cpuc-approves-permits-for-cruise-and-waymo-to-charge-fares-for-passenger-service-in-sf-2023)
+- 2025-01-05 — New York begins congestion-zone tolling · [MTA · Congestion Relief Zone launch information](https://www.mta.info/document/131571)
 
-Examples of corrections: New York's congestion-zone toll launch is dated 5 January 2025; the November 2022 Namma Yatri launch record does not claim a ₹25/day subscription launch fee; the game's one-time 52% fictional rival price reduction is explicitly separated from real share returns. Legacy vehicle/tariff descriptions have not been comprehensively verified.
+## Share-price observations
 
-The original Java prototype notes below describe the earlier implementation and should not be read as a specification of the current WebView dataset.
+Selected USD observations only; no daily interpolation or currency conversion. IPO offers and market closes are different price types. Bank-filed historical tables can contain corporate-action adjustments. SEC hosting is not independent SEC validation.
 
-The campaign draws on public historical facts, paraphrased here. The playable rivals are fictional and do not stand for particular real businesses. Historical company names and logos do not appear in the game. Source websites necessarily identify their own subjects; those references do not imply endorsement or a licence to use their branding.
+| Date | Exchange / ticker | USD per share | Type | Source |
+|---|---|---:|---|---|
+| 2019-03-28 | Nasdaq / LYFT | 72.00 | IPO offer | [Lyft IPO prospectus](https://www.sec.gov/Archives/edgar/data/1759509/000119312519091446/d721841d424b4.htm) |
+| 2019-05-09 | NYSE / UBER | 45.00 | IPO offer | [Uber IPO pricing announcement](https://investor.uber.com/news-events/news/press-release-details/2019/Uber-Announces-Pricing-of-Initial-Public-Offering/default.aspx) |
+| 2019-06-28 | Nasdaq / LYFT | 65.71 | Quarter-end close | [UBS SEC-filed pricing supplement · historical table sourced by UBS from Bloomberg; corporate-action adjustments may apply](https://www.sec.gov/Archives/edgar/data/1114446/000091412121003439/ub56184556-424b2.htm) |
+| 2019-09-30 | Nasdaq / LYFT | 40.84 | Quarter-end close | [UBS SEC-filed pricing supplement · historical table sourced by UBS from Bloomberg; corporate-action adjustments may apply](https://www.sec.gov/Archives/edgar/data/1114446/000091412121003439/ub56184556-424b2.htm) |
+| 2019-12-31 | Nasdaq / LYFT | 43.02 | Quarter-end close | [UBS SEC-filed pricing supplement · historical table sourced by UBS from Bloomberg; corporate-action adjustments may apply](https://www.sec.gov/Archives/edgar/data/1114446/000091412121003439/ub56184556-424b2.htm) |
+| 2020-03-31 | Nasdaq / LYFT | 26.85 | Quarter-end close | [UBS SEC-filed pricing supplement · historical table sourced by UBS from Bloomberg; corporate-action adjustments may apply](https://www.sec.gov/Archives/edgar/data/1114446/000091412121003439/ub56184556-424b2.htm) |
+| 2020-06-30 | Nasdaq / LYFT | 33.01 | Quarter-end close | [UBS SEC-filed pricing supplement · historical table sourced by UBS from Bloomberg; corporate-action adjustments may apply](https://www.sec.gov/Archives/edgar/data/1114446/000091412121003439/ub56184556-424b2.htm) |
+| 2020-09-30 | Nasdaq / LYFT | 27.55 | Quarter-end close | [UBS SEC-filed pricing supplement · historical table sourced by UBS from Bloomberg; corporate-action adjustments may apply](https://www.sec.gov/Archives/edgar/data/1114446/000091412121003439/ub56184556-424b2.htm) |
+| 2020-12-31 | Nasdaq / LYFT | 49.13 | Quarter-end close | [UBS SEC-filed pricing supplement · historical table sourced by UBS from Bloomberg; corporate-action adjustments may apply](https://www.sec.gov/Archives/edgar/data/1114446/000091412121003439/ub56184556-424b2.htm) |
+| 2021-03-31 | Nasdaq / LYFT | 63.18 | Quarter-end close | [UBS SEC-filed pricing supplement · historical table sourced by UBS from Bloomberg; corporate-action adjustments may apply](https://www.sec.gov/Archives/edgar/data/1114446/000091412121003439/ub56184556-424b2.htm) |
+| 2020-12-31 | NYSE / UBER | 51.00 | Quarter-end close | [Goldman Sachs SEC-filed pricing supplement · historical closing-price table; corporate-action adjustments may apply](https://www.sec.gov/Archives/edgar/data/886982/000156459021006310/gs-424b2.htm) |
 
-| Period | Documented context | Invented campaign interpretation |
-|---|---|---|
-| 2011 | Starting year chosen for the fictional business | One partner, two local service districts, 12,000 credits |
-| 2013 | An international app-based cab service tested in Bengaluru in August and formally announced launch in October | Competitive entry milestone; no assertion that all Indian mobility firms began in Bengaluru |
-| 2015 | Bike-taxi and employee-carpooling businesses emerged; the cab market saw a significant acquisition | Corporate-commute model unlock and 15% reduction in fictional driver onboarding costs |
-| 2020 | Nationwide lockdown was announced on 24 March | Demand multiplier 0.22 in 2020, 0.65 in 2021; one-time 52% reduction in fictional rival share prices |
-| 2022 | A driver-direct auto-booking platform launched in Bengaluru in November | Driver-subscription business model unlock |
-| 2025 | Campaign calendar stops advancing; sandbox continues | Not a claim about present-day market conditions |
-
-Sources for historical context:
-
-- [August 2013 Bengaluru test announcement](https://www.uber.com/in/en/blog/hello-india-secret-ubers-have-arrived-in-bangalore/).
-- [October 2013 formal Bengaluru launch announcement](https://www.uber.com/in/en/newsroom/namma-bengaluru-namma-uber-were-officially-in-bangalore/).
-- [Bike-taxi company's own account of its 2015 inception](https://www.rapido.bike/About).
-- [Carpooling company's account of its beginnings in 2015](https://quickride.in/about-us.php).
-- [Contemporaneous March 2015 acquisition report](https://www.business-standard.com/article/reuters/ola-buys-rival-taxiforsure-for-200-million-115030200466_1.html).
-- [Government announcement of nationwide lockdown, 24 March 2020](https://www.pib.gov.in/PressReleasePage.aspx?PRID=1608009&lang=2&reg=48).
-- [Contemporaneous report of the November 2022 driver-direct launch](https://www.news9live.com/state/karnataka/namma-yatri-auto-union-from-bengaluru-enters-ride-hailing-biz-with-new-app-205343).
-
-Game consequences are design choices, not quantitative findings about these events. No actual company valuations, private funding terms, investment returns, stock-price histories or merger outcomes are represented. Fictional exchange access is deliberately available from the start; it is not a claim that the historical companies were publicly tradable.
-
-The prototype abstracts city expansion into branch launches. It does not yet reconstruct each real operator's state-by-state growth, legal proceedings, licensing history, workforce arrangements or funding rounds. Those would require additional sourced research and design work. It also does not model current transport regulations.
+The game's 2020 demand multipliers, fictional 52% rival-price reduction, fees, acquisition results, and performance values are game design choices. The 20 campaign objectives are fictional challenges set in historical eras, not reconstructions of real company financial outcomes.

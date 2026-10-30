@@ -1,92 +1,68 @@
-# Lantern Dispatch — Mobility Empire
+# Lantern Dispatch — Native Android
 
-### Historical newspaper update
+An offline Android management game about turning one vehicle into a mobility company. The active game uses **Java, Android Views, and a Canvas-rendered city**, with no WebView, JavaScript runtime, remote map tiles, or third-party runtime libraries. Android 8.0+ is supported; the build targets Android 16 / API 36.
 
-The current WebView build includes **The Lantern Ledger**: newspaper popups that pause play, link to their sources, explain the gameplay context, and remain in a local archive. The bundled dataset currently contains 14 historical news/events across the six city campaigns and 11 historical Uber/Lyft price observations. Editions unlock against an internal calendar (50 simulated seconds per year); where a report was published after its event, the report waits until its publication date.
+The earlier browser prototype is retained in `legacy-web/` for reference and is excluded from Android packaging. Its saved campaigns use a different format and are not migrated into the native edition. Keep the old installation/data if that progress matters.
 
-Finance includes a separate historical USD price archive with ticker, exchange, observation date, price type, and source. These are selected IPO prices and quarter-end closes from 2019–2021, **not a complete daily price series**. Missing dates are not interpolated. The tradable fictional rivals still use the simulation economy. Historical facts do not imply that simulated market movements occurred in the real world.
+## Play
 
-Historical text is paraphrased from linked official announcements, regulatory records, SEC filings, and one contemporaneous newspaper report. Content works offline; opening external sources requires a connection. See `assets/history-data.js` for the curated dataset. Historical editions replace the previous unsourced city timeline headlines; vehicle descriptions and tariffs elsewhere remain prototype content and have not received a full historical audit.
+- Start Quick Play with a city, difficulty, and ambition; choose one of 20 historical campaigns; or learn through action-gated Academy tasks.
+- Tap a waiting trip or enable Auto. Vehicles collect passengers, follow roads, deliver loads, and turn around between jobs.
+- Grow and maintain the fleet, select service hubs per vehicle, switch between flexible dispatch and line-only operation, and improve comfort.
+- Open and upgrade hubs; build express corridors, depots, lounges, parcel terminals, and charging stations.
+- Hire/train/rest partners and hire managers. Training, fatigue, maintenance, dispatch management, and service quality affect operations.
+- Trade fictional rival shares, manage margin and bonds, acquire companies, and open international branches.
+- Read the native Lantern Ledger for sourced historical events, dated real share-price observations, and company alerts. Editions and management screens pause simulation; the selected speed resumes when you return to the city.
 
-Run `node tests/bulletins.cjs` for newspaper/date/price checks and `node tests/journey.cjs` for chapter checks. These browser tests currently use the workstation's bundled Playwright package and Microsoft Edge. Android simulation checks run during `build.ps1`; on-device touch and lifecycle verification remains outstanding.
+The city maps are original **offline schematics**, not geographic street maps. Real place names provide context. Game money and rival companies are fictional. UI text is currently English; the earlier prototype's language selector is not represented as native localization.
 
-An original offline Android management game about building a mobility company from Bengaluru into a national network. **Lantern Dispatch is a working title, not a cleared trademark.** Version 0.2.0 is a development prototype.
+## Install a development build
 
-![Desktop layout preview of the dispatch screen](preview-0.png)
+`dist/Lantern-Dispatch.apk` is the locally signed native development APK. It retains the package and development signing key used by the earlier manual build, when that local key is available. It is suitable for local installation and testing, not a Play production upload.
 
-All playable businesses, rival valuations, brands, artwork, layouts and economic rules are fictional. The historical campaign uses broad, documented developments in India's mobility sector. Real city names provide geographic context; the street map is an original schematic, not an actual Bengaluru road map.
+The Gradle debug APK has a separate application ID (`com.lantern.dispatch.dev`) so it can coexist with the development-signed manual build.
 
-## Install
+## Build in Android Studio / Gradle
 
-Open `Lantern-Dispatch.apk` on an Android 8.0+ phone or tablet. Android may ask you to allow installation from the app that opened the file. Hold the device in landscape orientation. This is a locally signed development APK, not a store release.
+Open this directory in Android Studio. Install JDK 17 and Android platform 36. The checked-in Gradle 8.11.1 wrapper verifies its distribution checksum. Android Gradle Plugin 8.10.1 and test dependencies download on first use.
 
-No internet connection, location permission, actual booking account or real money is involved.
+```powershell
+.\gradlew.bat engineTest testDebugUnitTest lintDebug assembleDebug
+.\gradlew.bat assembleRelease bundleRelease
+```
 
-## Start playing
+Outputs are under `build/outputs/`. Release builds enable code/resource shrinking. Without signing environment variables, the release APK and AAB are unsigned.
 
-1. In DISPATCH, tap a ride request to assign the closest available driver. Or switch AUTO DISPATCH on.
-2. In FLEET, recruit more partners. Each one has onboarding and ongoing operating costs.
-3. In EXPAND, open more Bengaluru districts. After 20 completed rides and three local districts, use NATIONAL EXPANSION to launch other city branches.
-4. In MARKET, invest in fictional competitors, use borrowed funds cautiously, and acquire controlling stakes.
-5. In HISTORY, read the campaign context and distinguish facts from invented effects.
+For store signing, provide your own upload key through environment variables; never commit the key or passwords:
 
-The long-term objective is six national city branches, ten driver partners and 100 rides. Play continues after the milestone. One simulated year lasts 60 game seconds; SPEED cycles 1×, 2×, 4× and pause.
+```powershell
+$env:LANTERN_KEYSTORE = 'C:\private\upload-key.jks'
+$env:LANTERN_KEY_ALIAS = 'upload'
+# Set LANTERN_STORE_PASSWORD and LANTERN_KEY_PASSWORD securely in the environment.
+.\gradlew.bat bundleRelease
+```
 
-Progress saves locally every 15 seconds and when the app leaves the foreground. No simulation runs while the app is closed. NEW asks before replacing your saved company. Finance menus pause the simulation; if a saved session resumes paused, use SPEED to continue.
+The package name, version code, signing identity, and any existing Play listing must be reviewed before upload. The bundled development certificate is not a production credential.
 
-## Systems implemented
+## Build without Gradle downloads
 
-- Original city schematic, animated cabs and road routing.
-- Ride queues, pickup/drop-off phases, vehicle turnaround, traffic cycles, missed requests and reputation.
-- Driver recruitment, local service territories and national branch contributions.
-- Three business models: commission, corporate commute and driver subscription.
-- Rival operators that earn money and compete for unassigned passengers.
-- Fictional share prices, price sparklines, ownership, dividends, margin interest and forced liquidation.
-- Acquisitions that integrate driver networks, rival treasury and a service territory.
-- Sourced historical context from 2011–2025, with scripted historical milestones.
-- Local saves and an original vector launcher icon.
-
-The prototype does not contain a real-world map, a real booking service, actual share trading or replicas of commercial apps. No original PC-game binaries, asset packs, maps, fonts, sounds or artwork are included.
-
-## Finance and strategy
-
-All figures are gameplay credits (`cr`), not actual rupee prices or investment guidance. The platform records only its retained income as revenue; gross passenger fares are tracked separately.
-
-- Commission retains 32% of fares in this simulation.
-- Corporate commute unlocks in 2015, retains 40%, and has stronger peak demand but weaker off-peak demand.
-- Driver subscription unlocks in 2022. It charges 80 credits per partner per 15-second quarter and takes no ride commission. It attracts more requests and can provide steadier receipts when ride demand falls.
-- Each rival has 100 fictional shares. Trades use lots of ten. Acquiring a rival requires at least 60 shares, no outstanding margin debt, and payment for remaining shares at a 15% premium plus 1,200 credits integration cost.
-- Buying on margin borrows 50% of purchase cost. Debt accrues 2% interest each quarter. Below 30% portfolio equity, the broker liquidates the entire portfolio; any shortfall is charged to company cash. Selling repays debt before releasing cash.
-- Acquisition integrates the rival treasury, up to the 12-driver fleet limit, and a district. Driver capacity beyond the limit converts to an invented disposal value.
-- National branches generate aggregate income. These are abstract regional operations, not cabs driving passengers between cities on the local map.
-
-These rules are intentionally simplified. They are not historical brokerage regulations, present-day platform pricing or a full accounting model. Negative operating cash is allowed in this prototype; insolvency/restructuring gameplay has not yet been implemented.
-
-## Build
-
-Requires JDK 17, Android platform 35 and build-tools 35.0.0. No Gradle downloads or third-party game libraries are needed.
+The manual build uses installed JDK 17, platform 36, and build-tools 35.0.0. It runs Java engine/save tests, packages **only `native-assets/`**, compiles native sources, aligns, signs with the local development key, and verifies the APK:
 
 ```powershell
 .\build.ps1 -Sdk 'C:\path\to\Android\Sdk' -Java 'C:\path\to\jdk-17'
+.\verify-native.ps1 -Apk '.\dist\Lantern-Dispatch.apk'
 ```
 
-The build runs the simulation tests, compiles and packages the application, aligns it, signs it, and verifies the signature. Output: `dist/Lantern-Dispatch.apk`. Keep the development signing key in `.build/development.p12` private if you need compatible updates. Keys and generated binaries are excluded from Git.
+`verify-native.ps1` rejects APKs containing HTML/JS/CSS assets or WebView runtime references. It also validates the historical dataset packaged in the APK.
 
-To run just the simulation tests with JDK 17 (without Android SDK):
+## Architecture and saves
 
-```sh
-javac -encoding UTF-8 -d .build/tests src/com/lantern/dispatch/Game.java tests/GameTest.java
-java -cp .build/tests com.lantern.dispatch.GameTest
-```
+`Game.java` is the platform-independent simulation. `MainActivity` owns the foreground-only frame loop and Android lifecycle, `CityMapView` draws the city, and `GamePanels` builds native management controls. `NativeNews` reads the bundled, attributed historical dataset.
 
-## Validation
+`SaveCodec` stores a versioned, size-bounded, checksummed snapshot with a restricted type allowlist and state validation. `SaveStore` writes using Android `AtomicFile` with rollback. The game saves on actions, every ten seconds while playing, and on backgrounding. In-progress trips, corridors, shares, staff, chapters, and the news archive persist. Rotation uses a Bundle snapshot, and save writes run on one ordered background executor. No simulation runs while the game is backgrounded.
 
-Simulation tests passed for road routing, dispatch, fare splitting, pause, funds, margin purchase/sale accounting, liquidation shortfalls, acquisitions, historical event progression, business-model gating, regional expansion, auto dispatch and one-time national objective rewards.
+## Validation and release status
 
-Four actual game drawing paths were rendered through a desktop graphics adapter for visual review. The `preview-*.png` files are **desktop layout previews**, not Android device screenshots. Basic navigation and auto-dispatch toggling were exercised through that adapter. Android compilation and APK signature checks passed.
+This is a **native release candidate**, not a certified store release. See [RELEASE.md](RELEASE.md) for validation results and remaining gates. Tests include simulation/accounting scenarios, all campaign objective checks, six-city save roundtrips, corrupted-save rejection, and Android UI/lifecycle tests using Robolectric. Runtime Android test previews, when generated, live in `build/native-previews/` and are not physical-device screenshots.
 
-No connected Android device or installed emulator image was available. Installation, native dialogs, lifecycle saves, touch usability, different screen sizes and prolonged performance still require on-device testing. This remains a prototype rather than a production-ready release.
-
-## Release preparation
-
-The source package is independent of the earlier archive analysis and contains no original game data. Before publication, clear the final game/fictional company names, review the final visuals and marketing, test devices, prepare store disclosures and complete an IP review. Fictional names and original code reduce copying risk; they do not guarantee that no third-party claim is possible.
+The app requests no Android permissions, includes no analytics/ads/purchases, and makes no network requests itself. Source links open the user's browser. See [PRIVACY.md](PRIVACY.md).

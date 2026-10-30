@@ -1,0 +1,74 @@
+plugins { id 'com.android.application' version '8.10.1' }
+
+android {
+    namespace 'com.lantern.dispatch'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'com.lantern.dispatch'
+        minSdk 26
+        targetSdk 36
+        versionCode 5
+        versionName '1.0.0-rc1'
+        testInstrumentationRunner 'android.test.InstrumentationTestRunner'
+    }
+    sourceSets {
+        main { manifest.srcFile 'AndroidManifest.xml'; java.srcDirs=['src']; res.srcDirs=['res']; assets.srcDirs=['native-assets'] }
+        androidTest { java.srcDirs=['androidTest'] }
+        test { java.srcDirs=['nativeTest'] }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }
+    signingConfigs {
+        release {
+            def keyPath=System.getenv('LANTERN_KEYSTORE')
+            if(keyPath) {
+                storeFile file(keyPath)
+                storePassword System.getenv('LANTERN_STORE_PASSWORD')
+                keyAlias System.getenv('LANTERN_KEY_ALIAS')
+                keyPassword System.getenv('LANTERN_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        debug { applicationIdSuffix '.dev'; versionNameSuffix '-dev' }
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if(System.getenv('LANTERN_KEYSTORE')) signingConfig signingConfigs.release
+        }
+    }
+    lint { abortOnError true; checkReleaseBuilds true }
+    testOptions {
+        unitTests.includeAndroidResources=true
+        unitTests.all {
+            systemProperty 'robolectric.dependency.repo.url','https://repo.maven.apache.org/maven2'
+            if(project.hasProperty('androidRuntimeDir')) {
+                systemProperty 'robolectric.offline','true'
+                systemProperty 'robolectric.dependency.dir',file(project.property('androidRuntimeDir')).absolutePath
+            }
+        }
+    }
+}
+
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.robolectric:robolectric:4.14.1'
+}
+
+tasks.register('compileEngineTests', JavaCompile) {
+    source files('src/com/lantern/dispatch/Game.java','src/com/lantern/dispatch/SaveCodec.java','tests/GameTest.java','tests/SaveCodecTest.java')
+    classpath=files()
+    destinationDirectory=layout.buildDirectory.dir('engine-tests')
+    options.encoding='UTF-8'
+    sourceCompatibility='1.8'
+    targetCompatibility='1.8'
+}
+tasks.register('engineTest') {
+    dependsOn 'compileEngineTests'
+    doLast {
+        ['GameTest','SaveCodecTest'].each { testClass ->
+            javaexec { classpath=files(layout.buildDirectory.dir('engine-tests')); mainClass='com.lantern.dispatch.'+testClass }
+        }
+    }
+}
+tasks.named('preBuild') { dependsOn 'engineTest' }

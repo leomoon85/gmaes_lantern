@@ -3,15 +3,29 @@ package com.lantern.dispatch;
 import android.content.Context;
 import android.graphics.*;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.view.Gravity;
 import android.view.View;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
-/** Original code-drawn identity, navigation icons, and city artwork. */
+/** Original code-drawn identity, navigation icons, Tropico-inspired medallions, and city artwork. */
 final class BrandArt extends View {
-  private final Paint p = new Paint(3);
+  private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
   private final Shader backdrop =
-      new LinearGradient(0, 0, 420, 210, 0xff111d34, 0xff080f1d, Shader.TileMode.CLAMP);
+      new LinearGradient(
+          0,
+          0,
+          420,
+          210,
+          new int[] {0xff1c2d48, 0xff132238, 0xff0a1322},
+          new float[] {0f, 0.58f, 1f},
+          Shader.TileMode.CLAMP);
+  private final Shader sunGlow =
+      new RadialGradient(
+          336, 48, 95, 0x55ffd27d, 0x00ffd27d, Shader.TileMode.CLAMP);
   private final Path street = new Path();
-  private final DashPathEffect laneDashes = new DashPathEffect(new float[] {5, 7}, 0);
+  private final DashPathEffect laneDashes = new DashPathEffect(new float[] {6, 7}, 0);
   private static final float[][] NODES = {{52, 145}, {177, 164}, {281, 125}, {374, 103}};
 
   BrandArt(Context context) {
@@ -30,51 +44,203 @@ final class BrandArt extends View {
     p.setStyle(Paint.Style.FILL);
     p.setShader(backdrop);
     c.drawRect(0, 0, 420, 210, p);
+    p.setShader(sunGlow);
+    c.drawCircle(336, 48, 95, p);
     p.setShader(null);
-    p.setColor(0xff192b43);
+
+    // Distant harbor & tropical coast band
+    p.setColor(0xff102c3f);
+    c.drawRect(0, 152, 420, 210, p);
+    p.setColor(0x3373d6cf);
+    c.drawRect(0, 152, 420, 155, p);
+
+    // Sunlit skyline silhouettes with brass-lit windows
     for (int i = 0; i < 14; i++) {
-      float x = i * 34 - 15, top = 30 + (i * 37 % 80);
-      c.drawRoundRect(x, top, x + 26, 190, 3, 3, p);
-    }
-    p.setColor(0xff2b425b);
-    for (int i = 0; i < 14; i++)
+      float x = i * 32 - 10, top = 34 + (i * 37 % 72);
+      p.setColor(i % 2 == 0 ? 0xff192c46 : 0xff213654);
+      c.drawRoundRect(x, top, x + 25, 162, 3, 3, p);
+      p.setColor(0x55ffd27a);
+      c.drawRect(x + 2, top, x + 23, top + 2, p);
       for (int y = 0; y < 5; y++) {
-        float x = i * 34 - 10, top = 45 + (i * 37 % 80) + y * 17;
-        if (top < 180) c.drawRect(x, top, x + 5, top + 6, p);
+        float wy = top + 10 + y * 16;
+        if (wy < 150) {
+          p.setColor((i + y) % 3 == 0 ? 0xbbffd485 : 0xff314b68);
+          c.drawRect(x + 5, wy, x + 10, wy + 6, p);
+          c.drawRect(x + 14, wy, x + 19, wy + 6, p);
+        }
       }
-    p.setColor(0xff101a2b);
-    p.setStrokeWidth(24);
-    p.setStrokeCap(Paint.Cap.ROUND);
-    c.drawPath(street, stroke(0xff263a52, 24));
-    c.drawPath(street, stroke(0xff111e30, 18));
-    p.setPathEffect(laneDashes);
-    c.drawPath(street, stroke(0xffe9b46b, 1.8f));
-    p.setPathEffect(null);
-    p.setStyle(Paint.Style.FILL);
-    for (float[] node : NODES) {
-      p.setColor(0x22ffd184);
-      c.drawCircle(node[0], node[1], 17, p);
-      p.setColor(0xfff5c071);
-      c.drawCircle(node[0], node[1], 7, p);
-      p.setColor(0xff101b2c);
-      c.drawCircle(node[0], node[1], 3, p);
     }
+
+    // Sculpted highway corridor & brass rail trim
+    p.setStrokeCap(Paint.Cap.ROUND);
+    c.drawPath(street, stroke(0x55000000, 28));
+    c.drawPath(street, stroke(0xff38526e, 24));
+    c.drawPath(street, stroke(0xff142336, 18));
+    p.setPathEffect(laneDashes);
+    c.drawPath(street, stroke(0xfff5c472, 2.1f));
+    p.setPathEffect(null);
+
+    // Ornate station medallions along the route
+    p.setStyle(Paint.Style.FILL);
+    for (int i = 0; i < NODES.length; i++) {
+      float[] node = NODES[i];
+      p.setColor(0x33ffd184);
+      c.drawCircle(node[0], node[1], 18, p);
+      p.setColor(i == 2 ? 0xff73d6cf : 0xfff5c071);
+      c.drawCircle(node[0], node[1], 8.5f, p);
+      p.setColor(0xff101b2c);
+      c.drawCircle(node[0], node[1], 4.2f, p);
+      p.setColor(0xfffff2cf);
+      c.drawCircle(node[0], node[1], 1.8f, p);
+    }
+
+    // Hero Tycoon Coach on the avenue
     c.save();
     c.translate(229, 157);
     c.rotate(-24);
-    p.setColor(0xfff3bd70);
+    p.setColor(0x66000000);
+    c.drawRoundRect(-23, -9, 23, 13, 6, 6, p);
+    p.setColor(0xfff4bf6f);
     c.drawRoundRect(-22, -11, 22, 11, 5, 5, p);
     p.setColor(0xff172435);
-    c.drawRoundRect(-8, -8, 9, 8, 2, 2, p);
+    c.drawRoundRect(-9, -8, 9, 8, 2.5f, 2.5f, p);
+    p.setColor(0xff73d6cf);
+    c.drawRoundRect(-3, -3, 3, 3, 1.5f, 1.5f, p);
     p.setColor(0xfffff4cc);
-    c.drawRect(17, -8, 20, -3, p);
-    c.drawRect(17, 3, 20, 8, p);
+    c.drawRect(17, -8, 21, -3, p);
+    c.drawRect(17, 3, 21, 8, p);
     c.restore();
-    p.setColor(0xff75d5cb);
-    c.drawCircle(330, 49, 5, p);
-    p.setColor(0xff31495d);
-    c.drawCircle(330, 49, 13, stroke(0xff31495d, 1));
+
+    // Sun & compass rose seal in sky
+    p.setColor(0xfff5c472);
+    c.drawCircle(336, 48, 7, p);
+    c.drawCircle(336, 48, 15, stroke(0x88f5c472, 1.4f));
     c.restore();
+  }
+
+  static View meterRow(
+      Context ctx, String label, int percent, int fillColor, String rightText, float density) {
+    int clamped = Math.max(0, Math.min(100, percent));
+    LinearLayout wrap = new LinearLayout(ctx);
+    wrap.setOrientation(LinearLayout.VERTICAL);
+    LinearLayout.LayoutParams wrapLp =
+        new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+    wrapLp.topMargin = Math.round(5 * density);
+    wrap.setLayoutParams(wrapLp);
+
+    LinearLayout top = new LinearLayout(ctx);
+    top.setOrientation(LinearLayout.HORIZONTAL);
+    top.setGravity(Gravity.CENTER_VERTICAL);
+    TextView left = new TextView(ctx);
+    left.setText(label);
+    left.setTextColor(0xffb8c7d9);
+    left.setTextSize(10.5f);
+    left.setTypeface(Typeface.DEFAULT_BOLD);
+    top.addView(
+        left,
+        new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+    TextView right = new TextView(ctx);
+    right.setText(rightText != null ? rightText : (clamped + "%"));
+    right.setTextColor(fillColor);
+    right.setTextSize(10.5f);
+    right.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+    top.addView(right);
+    wrap.addView(top);
+
+    LinearLayout track = new LinearLayout(ctx);
+    track.setOrientation(LinearLayout.HORIZONTAL);
+    GradientDrawable trackBg = new GradientDrawable();
+    trackBg.setColor(0xff0b1320);
+    trackBg.setCornerRadius(5 * density);
+    trackBg.setStroke(Math.max(1, Math.round(density * 0.8f)), 0xff273a52);
+    track.setBackground(trackBg);
+    LinearLayout.LayoutParams trackLp =
+        new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, Math.round(7 * density));
+    trackLp.topMargin = Math.round(2 * density);
+    track.setLayoutParams(trackLp);
+
+    View fill = new View(ctx);
+    GradientDrawable fillBg = new GradientDrawable();
+    fillBg.setColor(fillColor);
+    fillBg.setCornerRadius(5 * density);
+    fill.setBackground(fillBg);
+    track.addView(
+        fill,
+        new LinearLayout.LayoutParams(
+            0, LinearLayout.LayoutParams.MATCH_PARENT, Math.max(2, clamped)));
+
+    View rest = new View(ctx);
+    track.addView(
+        rest,
+        new LinearLayout.LayoutParams(
+            0, LinearLayout.LayoutParams.MATCH_PARENT, Math.max(0, 100 - clamped)));
+
+    wrap.addView(track);
+    return wrap;
+  }
+
+  static Drawable crestDrawable(final int fillColor, final int ringColor, final float density) {
+    return new Drawable() {
+      final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+      @Override
+      public int getIntrinsicWidth() {
+        return Math.round(32 * density);
+      }
+
+      @Override
+      public int getIntrinsicHeight() {
+        return Math.round(32 * density);
+      }
+
+      @Override
+      public void draw(Canvas canvas) {
+        Rect b = getBounds();
+        float cx = b.exactCenterX(), cy = b.exactCenterY();
+        float r = Math.min(b.width(), b.height()) * 0.46f;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(fillColor);
+        canvas.drawCircle(cx, cy, r, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(Math.max(1.5f, 1.8f * density));
+        paint.setColor(ringColor);
+        canvas.drawCircle(cx, cy, r, paint);
+        paint.setStrokeWidth(Math.max(1f, 0.9f * density));
+        paint.setColor(0x66ffd996);
+        canvas.drawCircle(cx, cy, r * 0.76f, paint);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(ringColor);
+        Path star = new Path();
+        star.moveTo(cx, cy - r * 0.52f);
+        star.lineTo(cx + r * 0.16f, cy - r * 0.16f);
+        star.lineTo(cx + r * 0.52f, cy);
+        star.lineTo(cx + r * 0.16f, cy + r * 0.16f);
+        star.lineTo(cx, cy + r * 0.52f);
+        star.lineTo(cx - r * 0.16f, cy + r * 0.16f);
+        star.lineTo(cx - r * 0.52f, cy);
+        star.lineTo(cx - r * 0.16f, cy - r * 0.16f);
+        star.close();
+        canvas.drawPath(star, paint);
+      }
+
+      @Override
+      public void setAlpha(int alpha) {
+        paint.setAlpha(alpha);
+      }
+
+      @Override
+      public void setColorFilter(ColorFilter colorFilter) {
+        paint.setColorFilter(colorFilter);
+      }
+
+      @Override
+      public int getOpacity() {
+        return PixelFormat.TRANSLUCENT;
+      }
+    };
   }
 
   private Paint stroke(int color, float width) {

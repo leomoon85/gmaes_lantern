@@ -236,7 +236,7 @@ public final class Game implements java.io.Serializable {
         75000L,
         1,
         1,
-        7,
+        6,
         50),
     new HistoricalScenarioDef(
         12,
@@ -262,7 +262,7 @@ public final class Game implements java.io.Serializable {
         70000L,
         1,
         1,
-        7,
+        6,
         50),
     new HistoricalScenarioDef(
         14,
@@ -340,7 +340,7 @@ public final class Game implements java.io.Serializable {
         312500L,
         4,
         3,
-        7,
+        6,
         65)
   };
 
@@ -742,6 +742,7 @@ public final class Game implements java.io.Serializable {
     loadScenario(h.cityId);
     campaignStartYear = h.startYear;
     campaignEndYear = h.endYear;
+    syncHistoryStageToStartYear();
     if (h.id == 4) {
       this.bonds = 2;
     } else if (h.id == 17) {
@@ -749,6 +750,14 @@ public final class Game implements java.io.Serializable {
       this.cash = 9500;
     }
     this.message = "Scenario #" + (h.id + 1) + " [" + h.era + "]: " + h.objective;
+  }
+
+  private void syncHistoryStageToStartYear() {
+    if (campaignStartYear >= 2022) historyStage = 4;
+    else if (campaignStartYear >= 2020) historyStage = 3;
+    else if (campaignStartYear >= 2015) historyStage = 2;
+    else if (campaignStartYear >= 2013) historyStage = 1;
+    else historyStage = 0;
   }
 
   public void startTutorial() {
@@ -1435,13 +1444,41 @@ public final class Game implements java.io.Serializable {
     spend(price);
     Taxi vehicle = new Taxi(taxis.size() + 1, districts.get(0).cell());
     taxis.add(vehicle);
-    for (Driver driver : drivers)
-      if (driver.assignedTaxiId == 0) {
-        driver.assignedTaxiId = vehicle.id;
-        break;
-      }
+    assignAvailableDrivers();
     message = "New vehicle ready at " + districts.get(0).name + ".";
     return true;
+  }
+
+  public void assignAvailableDrivers() {
+    HashSet<Integer> validTaxis = new HashSet<>();
+    for (Taxi taxi : taxis) validTaxis.add(taxi.id);
+    HashSet<Integer> assignedTaxis = new HashSet<>();
+    for (Driver driver : drivers) {
+      if (driver.assignedTaxiId != 0 && !validTaxis.contains(driver.assignedTaxiId)) {
+        driver.assignedTaxiId = 0;
+      }
+      if (driver.assignedTaxiId > 0) {
+        if (!assignedTaxis.add(driver.assignedTaxiId)) {
+          driver.assignedTaxiId = 0;
+        }
+      }
+    }
+    for (Driver driver : drivers) {
+      if (driver.assignedTaxiId == 0) {
+        for (Taxi taxi : taxis) {
+          if (!assignedTaxis.contains(taxi.id)) {
+            driver.assignedTaxiId = taxi.id;
+            assignedTaxis.add(taxi.id);
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  public boolean isStaffed(Taxi taxi) {
+    if (taxi == null) return false;
+    return driverFor(taxi) != null || (taxi.tier >= 3 && year() >= 2022);
   }
 
   public boolean unlock(int i) {
@@ -1475,8 +1512,13 @@ public final class Game implements java.io.Serializable {
     if (r == null) return false;
     Taxi nearest = null;
     int[] best = null;
+    boolean unstaffedIdle = false;
     for (Taxi t : taxis)
       if (t.status == IDLE) {
+        if (!isStaffed(t)) {
+          unstaffedIdle = true;
+          continue;
+        }
         int[] path = route(t.cell, districts.get(r.from).cell());
         if (path != null && (best == null || path.length < best.length)) {
           nearest = t;
@@ -1484,14 +1526,18 @@ public final class Game implements java.io.Serializable {
         }
       }
     if (nearest == null) {
-      message = "All consists are busy. Buy another or wait for arrival.";
+      message =
+          unstaffedIdle
+              ? "Idle vehicles need an assigned driver. Recruit a driver in Fleet & Team."
+              : "All consists are busy. Buy another or wait for arrival.";
       return false;
     }
     return assignRide(r, nearest, best);
   }
 
   private boolean assignRide(Ride r, Taxi vehicle, int[] pickupPath) {
-    if (vehicle == null || vehicle.status != IDLE || pickupPath == null) return false;
+    if (vehicle == null || vehicle.status != IDLE || !isStaffed(vehicle) || pickupPath == null)
+      return false;
     Taxi nearest = vehicle;
     int[] best = pickupPath;
     nearest.ride = r;
@@ -1507,6 +1553,23 @@ public final class Game implements java.io.Serializable {
     return true;
   }
 
+  public long estimatedIncome(Ride r) {
+    if (r == null) return 0;
+    Taxi ref = taxis.isEmpty() ? null : taxis.get(0);
+    for (Taxi t : taxis)
+      if (t.status == IDLE && isStaffed(t)) {
+        ref = t;
+        break;
+      }
+    long tierTip = ref == null ? 0 : (ref.tier - 1) * 12L + (ref.comfortLevel - 1) * 8L;
+    Driver partner = ref == null ? null : driverFor(ref);
+    double serviceFactor =
+        partner == null ? 1 : 1 + (partner.level - 1) * .03 - (partner.fatigue >= 85 ? .1 : 0);
+    return businessModel == 2
+        ? tierTip
+        : Math.round(r.fare * (businessModel == 1 ? .40 : .32) * serviceFactor) + tierTip;
+  }
+
   private void arrive(Taxi t) {
     if (t.status == PICKUP) {
       District orig = districts.get(t.ride.from);
@@ -1520,6 +1583,7 @@ public final class Game implements java.io.Serializable {
       t.at = 0;
       t.progress = 0;
     } else if (t.status == RIDING) {
+      District orig = districts.get(t.ride.from);
       District dest = districts.get(t.ride.to);
       if (dest.hasFacility(FAC_MAINT)) {
         t.condition = 100.0;
@@ -1546,7 +1610,11 @@ public final class Game implements java.io.Serializable {
       cash += income;
       revenue += income;
       rides++;
-      cargoTons += t.capacity;
+      if (t.ride.kind == KIND_CARGO
+          || orig.hasFacility(FAC_CARGO)
+          || dest.hasFacility(FAC_CARGO)) {
+        cargoTons += t.capacity;
+      }
       int k = t.ride.kind;
       dest.demandMult[k] = Math.max(85, dest.demandMult[k] - 6);
       for (int other = 0; other < 4; other++)
@@ -1630,15 +1698,8 @@ public final class Game implements java.io.Serializable {
     if (cash < cost) return false;
     spend(cost);
     int id = drivers.size() + 1;
-    HashSet<Integer> assigned = new HashSet<>();
-    for (Driver driver : drivers) assigned.add(driver.assignedTaxiId);
-    int vehicle = 0;
-    for (Taxi taxi : taxis)
-      if (!assigned.contains(taxi.id)) {
-        vehicle = taxi.id;
-        break;
-      }
-    drivers.add(new Driver(id, name != null ? name : ("Driver #" + id), 4.7, vehicle));
+    drivers.add(new Driver(id, name != null ? name : ("Driver #" + id), 4.7, 0));
+    assignAvailableDrivers();
     message = "Recruited " + drivers.get(drivers.size() - 1).name + ".";
     return true;
   }
@@ -1756,6 +1817,7 @@ public final class Game implements java.io.Serializable {
       message = "Insolvency restructuring: emergency bond issued at 10% discount to cover deficit.";
     } else if (taxis.size() > 1) {
       taxis.remove(taxis.size() - 1);
+      assignAvailableDrivers();
       cash += 1800;
       message =
           "Receivership restructuring: 1 consist auctioned to creditors to restore liquidity.";
@@ -1870,6 +1932,7 @@ public final class Game implements java.io.Serializable {
     int inherited = Math.min(c.fleet, MAX_FLEET - taxis.size());
     for (int n = 0; n < inherited; n++)
       taxis.add(new Taxi(taxis.size() + 1, districts.get(c.district).cell()));
+    assignAvailableDrivers();
     cash += c.cash + (c.fleet - inherited) * 1500L;
     districts.get(c.district).open = true;
     int[] p = route(districts.get(0).cell(), districts.get(c.district).cell());
@@ -2057,7 +2120,7 @@ public final class Game implements java.io.Serializable {
     }
     if (autoDispatch) {
       for (Taxi vehicle : taxis)
-        if (vehicle.status == IDLE) {
+        if (vehicle.status == IDLE && isStaffed(vehicle)) {
           Ride selected = null;
           for (Ride request : requests)
             if (vehicle.routeStops.contains(request.from)
@@ -2197,7 +2260,7 @@ public final class Game implements java.io.Serializable {
     return total / taxis.size();
   }
 
-  private Driver driverFor(Taxi taxi) {
+  public Driver driverFor(Taxi taxi) {
     for (Driver driver : drivers) if (driver.assignedTaxiId == taxi.id) return driver;
     return null;
   }

@@ -123,12 +123,9 @@ final class WorldMapView extends FrameLayout {
   }
 
   void toggleStreets() {
-    if (streets && !loaded && streetMap != null) {
-      loadStyle();
-      return;
-    }
     streets = !streets;
     if (!streets) {
+      removeCallbacks(timeout);
       fallback.setVisibility(VISIBLE);
       if (mapView != null) mapView.setVisibility(GONE);
       status = "Offline city · ready to play";

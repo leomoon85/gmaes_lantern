@@ -71,6 +71,7 @@ public final class SaveCodec {
       if (!(object instanceof Game)) throw new IOException("Not a game save");
       Game game = (Game) object;
       validate(game);
+      game.assignAvailableDrivers();
       return game;
     } catch (ClassNotFoundException | RuntimeException e) {
       throw new IOException("Invalid save data", e);
@@ -82,6 +83,8 @@ public final class SaveCodec {
     require(
         g.gameMode >= 0
             && g.gameMode <= Game.MODE_CITY
+            && g.businessModel >= 0
+            && g.businessModel <= 2
             && g.quickGoalType >= 0
             && g.quickGoalType < Game.QUICK_GOAL_NAMES.length
             && g.historicalScenarioId >= 0
@@ -153,6 +156,9 @@ public final class SaveCodec {
     for (Game.Driver driver : g.drivers)
       require(
           driver != null
+              && driver.name != null
+              && driver.level >= 1
+              && driver.level <= 3
               && Double.isFinite(driver.skill)
               && Double.isFinite(driver.fatigue)
               && driver.skill >= 0
@@ -161,10 +167,22 @@ public final class SaveCodec {
               && driver.fatigue <= 100,
           "Invalid partner");
     for (int tier : g.corridorTier) require(tier >= 0 && tier <= 3, "Invalid corridor");
-    for (Game.District d : g.districts)
+    for (Game.District d : g.districts) {
       require(
-          d != null && d.cell() >= 0 && d.cell() < Game.W * Game.H && d.level >= 1 && d.level <= 3,
+          d != null
+              && d.name != null
+              && d.cell() >= 0
+              && d.cell() < Game.W * Game.H
+              && d.level >= 1
+              && d.level <= 3
+              && d.supply != null
+              && d.supply.length == 4
+              && d.demandMult != null
+              && d.demandMult.length == 4,
           "Invalid district");
+      for (int s : d.supply) require(s >= 0 && s <= 24, "Invalid district supply");
+      for (int dm : d.demandMult) require(dm >= 50 && dm <= 250, "Invalid district demand");
+    }
     for (Game.Taxi t : g.taxis) {
       require(
           t != null
@@ -185,10 +203,23 @@ public final class SaveCodec {
               && Double.isFinite(t.charge)
               && Double.isFinite(t.condition)
               && t.condition >= 0
-              && t.condition <= 100,
+              && t.condition <= 100
+              && Double.isFinite(t.cleanliness)
+              && t.cleanliness >= 0
+              && t.cleanliness <= 100
+              && Double.isFinite(t.comfort)
+              && t.comfort >= 0
+              && t.comfort <= 100,
           "Invalid vehicle state");
       require(
-          t.tier >= 1 && t.tier <= 3 && t.routeStops != null && t.routeStops.size() <= 6,
+          t.tier >= 1
+              && t.tier <= 3
+              && t.comfortLevel >= 1
+              && t.comfortLevel <= 3
+              && t.capacity >= 1
+              && t.capacity <= 12
+              && t.routeStops != null
+              && t.routeStops.size() <= 6,
           "Invalid vehicle tier");
       for (int cell : t.path)
         require(
@@ -200,15 +231,38 @@ public final class SaveCodec {
       if (t.ride != null) validateRide(t.ride);
     }
     for (Game.Ride r : g.requests) validateRide(r);
-    for (Game.Company c : g.companies)
+    for (Game.Company c : g.companies) {
       require(
           c != null
+              && c.name != null
               && c.price >= 5
               && c.owned >= 0
               && c.owned <= 100
+              && c.district >= 0
+              && c.district < 6
+              && c.targetDistrict >= 0
+              && c.targetDistrict < 6
+              && c.cell >= 0
+              && c.cell < Game.W * Game.H
+              && Double.isFinite(c.progress)
+              && c.progress >= 0
+              && c.progress < 1
               && c.priceHistory != null
               && c.priceHistory.size() <= 18,
           "Invalid shares");
+      if (c.path != null) {
+        require(
+            c.path.length >= 1
+                && c.path.length <= Game.W * Game.H
+                && c.at >= 0
+                && c.at < c.path.length,
+            "Invalid rival route");
+        for (int cell : c.path)
+          require(
+              cell >= 0 && cell < Game.W * Game.H && Game.road(cell % Game.W, cell / Game.W),
+              "Invalid rival road cell");
+      }
+    }
   }
 
   private static void validateRide(Game.Ride r) throws IOException {

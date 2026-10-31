@@ -95,6 +95,20 @@ public final class SaveCodecTest {
     check(
         restored.campaignStartYear == 2010 && restored.historicalScenarioId == 19,
         "Historical campaign persists");
+    Game badModel = new Game();
+    badModel.businessModel = 99;
+    try {
+      SaveCodec.encode(badModel);
+      throw new AssertionError("Invalid businessModel accepted");
+    } catch (IOException expected) {
+    }
+    Game badRival = new Game();
+    badRival.companies.get(0).at = 99;
+    try {
+      SaveCodec.encode(badRival);
+      throw new AssertionError("Invalid rival route index accepted");
+    } catch (IOException expected) {
+    }
     System.out.println(
         "PASS: six-city native save roundtrip, active routes, ledger, team, news, deterministic"
             + " continuation, checksum/truncation protection, invalid state rejection.");

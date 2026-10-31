@@ -328,6 +328,63 @@ public class GameTest {
       check(victory.objectiveComplete(), "Historical objective " + scenario + " achievable");
     }
 
+    // Regression tests for CODE-REVIEW.md findings:
+    // 1. Modern campaigns (e.g. 2021+) must not replay the 2020 stock crash on first tick
+    Game modern = new Game();
+    modern.startHistoricalScenario(6); // starts in 2021
+    int initialPrice = modern.companies.get(0).price;
+    modern.tick(.1);
+    check(
+        modern.companies.get(0).price == initialPrice,
+        "2021+ historical scenario does not replay 2020 stock crash at startup");
+
+    // 2. Passenger trips must not increment cargoTons; cargo trips do
+    Game cargoCheck = new Game();
+    cargoCheck.requests.clear();
+    cargoCheck.createRide(0, 1); // KIND_EXECUTIVE passenger trip
+    check(cargoCheck.dispatch(cargoCheck.requests.get(0).id), "Dispatch passenger trip");
+    run(cargoCheck, 120);
+    check(
+        cargoCheck.rides >= 1 && cargoCheck.cargoTons == 0,
+        "Passenger trips do not count toward cargo tonnage");
+    cargoCheck.cash = 50000;
+    cargoCheck.unlock(3); // District 3 generates KIND_CARGO
+    cargoCheck.requests.clear();
+    cargoCheck.createRide(3, 0);
+    for (Game.Taxi t : cargoCheck.taxis) {
+      t.status = Game.IDLE;
+      t.charge = 0;
+    }
+    check(cargoCheck.dispatch(cargoCheck.requests.get(0).id), "Dispatch cargo trip");
+    run(cargoCheck, 120);
+    check(cargoCheck.cargoTons > 0, "Cargo trips increment cargoTons");
+
+    // 3. Unstaffed vehicles cannot dispatch until a driver is assigned, and mergers assign waiting drivers
+    Game staffing = new Game();
+    staffing.cash = 50000;
+    check(staffing.buyTaxi(), "Buy second vehicle without recruiting second driver");
+    staffing.taxis.get(0).status = Game.CHARGING;
+    staffing.taxis.get(0).charge = 50;
+    check(
+        !staffing.dispatch(staffing.requests.get(0).id),
+        "Unstaffed vehicle cannot be dispatched without a driver");
+    check(staffing.recruitDriver("Meera S."), "Recruit driver for second vehicle");
+    check(
+        staffing.driverFor(staffing.taxis.get(1)) != null,
+        "Recruited driver is paired with unstaffed vehicle");
+    check(
+        staffing.dispatch(staffing.requests.get(0).id),
+        "Newly staffed second vehicle dispatches waiting ride");
+
+    Game mergeStaff = new Game();
+    mergeStaff.cash = 100000;
+    mergeStaff.recruitDriver("Standby Driver");
+    for (int i = 0; i < 6; i++) mergeStaff.buyShares(1, false);
+    check(mergeStaff.merge(1), "Merge rival company");
+    check(
+        mergeStaff.driverFor(mergeStaff.taxis.get(1)) != null,
+        "Merger pairs waiting unassigned driver with inherited vehicle");
+
     System.out.println(
         "PASS: roads, dispatch, fares, pause, funds, margin accounting/liquidation, mergers,"
             + " history, subscriptions, expansion, auto dispatch, national goal, hub upgrades,"

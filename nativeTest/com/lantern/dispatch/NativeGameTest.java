@@ -226,6 +226,21 @@ public class NativeGameTest {
     assertTrue(activity.game.rides > 0);
   }
 
+  @Test
+  public void cancellingStartNewCompanyRestoresHomeMenu() throws Exception {
+    SaveStore store = new SaveStore(activity);
+    store.write(SaveCodec.encode(new Game(0)));
+    dialogButton("Learn to play").performClick();
+    Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+    AlertDialog confirm = ShadowAlertDialog.getLatestAlertDialog();
+    assertNotNull(confirm);
+    assertTrue(confirm.isShowing());
+    confirm.getButton(AlertDialog.BUTTON_NEGATIVE).performClick();
+    Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+    assertTrue("Home menu re-opens after cancelling new company", activity.modalOpen());
+    assertNotNull(dialogButton("Learn to play"));
+  }
+
   private boolean containsBrowser(View view) {
     if (view.getClass().getName().contains("WebView")) return true;
     if (view instanceof ViewGroup) {

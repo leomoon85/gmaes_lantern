@@ -37,9 +37,10 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
       () -> {
         if (this.foreground && !this.closed) Choreographer.getInstance().postFrameCallback(this);
       };
-  private LinearLayout root, nav, management, dispatch, goalBox;
-  private TextView title, metrics, message, goalTitle, goalDetail;
-  private Button speedButton, goalAction;
+  private LinearLayout root, nav, management, dispatch, goalBox, goalBody;
+  private TextView title, metrics, message, goalTitle, goalDetail, campaignGoalText;
+  private Button speedButton, goalAction, goalCollapseButton;
+  private boolean goalCollapsed = false;
   WorldMapView map;
   private FrameLayout worldPane;
   private boolean wideLayout;
@@ -247,7 +248,16 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
     GradientDrawable d = new GradientDrawable();
     d.setColor(color);
     d.setCornerRadius(dp(radius));
-    d.setStroke(dp(1), 0x263f5874);
+    d.setStroke(dp(1), 0x45d8ab61);
+    return d;
+  }
+
+  GradientDrawable medallionShape(int topColor, int bottomColor, int strokeColor, int radius) {
+    GradientDrawable d =
+        new GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM, new int[] {topColor, bottomColor});
+    d.setCornerRadius(dp(radius));
+    d.setStroke(Math.max(1, dp(1.4f)), strokeColor);
     return d;
   }
 
@@ -332,18 +342,20 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
           return insets;
         });
     root.requestApplyInsets();
+    float density = getResources().getDisplayMetrics().density;
     LinearLayout header = new LinearLayout(this);
     header.setGravity(Gravity.CENTER_VERTICAL);
-    header.setPadding(dp(14), dp(10), dp(12), dp(10));
+    header.setPadding(dp(12), dp(8), dp(12), dp(6));
+    header.setBackground(medallionShape(0xff162740, 0xff0d1829, 0x55edbb73, 0));
     ImageView mark = new ImageView(this);
-    mark.setImageResource(R.drawable.ic_launcher);
+    mark.setImageDrawable(BrandArt.crestDrawable(0xff14253b, AMBER, density));
     mark.setContentDescription("Fareforge");
-    header.addView(mark, new LinearLayout.LayoutParams(dp(40), dp(44)));
+    header.addView(mark, new LinearLayout.LayoutParams(dp(38), dp(38)));
     LinearLayout heading = vertical();
     heading.setPadding(dp(10), 0, 0, 0);
-    TextView brand = text("FAREFORGE", 10, AMBER, true);
-    brand.setLetterSpacing(.20f);
-    title = text("CITY OPERATIONS", 18, INK, true);
+    TextView brand = text("FAREFORGE  ·  TYCOON ALMANAC", 9, AMBER, true);
+    brand.setLetterSpacing(.16f);
+    title = text("CITY OPERATIONS", 17, INK, true);
     heading.addView(brand);
     heading.addView(title);
     header.addView(heading, new LinearLayout.LayoutParams(0, -2, 1));
@@ -355,15 +367,25 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
               updateHud(true);
               saveAsync();
             });
-    header.addView(speedButton, new LinearLayout.LayoutParams(dp(46), dp(46)));
+    speedButton.setBackground(medallionShape(0xff243b59, 0xff16263b, AMBER, 22));
+    speedButton.setTextColor(AMBER);
+    header.addView(speedButton, new LinearLayout.LayoutParams(dp(48), dp(44)));
     Button menu = button("Menu", () -> showHome(true));
-    LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(dp(58), dp(46));
+    menu.setBackground(medallionShape(0xff213652, 0xff142338, 0x88edbb73, 14));
+    LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(dp(60), dp(44));
     mp.leftMargin = dp(6);
     header.addView(menu, mp);
     root.addView(header);
-    metrics = text("", 13, MINT, true);
-    metrics.setPadding(dp(18), 0, dp(12), dp(11));
-    root.addView(metrics);
+
+    LinearLayout almanacWrap = new LinearLayout(this);
+    almanacWrap.setPadding(dp(10), dp(5), dp(10), dp(6));
+    almanacWrap.setBackgroundColor(0xff091220);
+    metrics = text("", 12, MINT, true);
+    metrics.setPadding(dp(12), dp(6), dp(12), dp(6));
+    metrics.setBackground(medallionShape(0xff172a42, 0xff101d30, 0x6677d7c8, 12));
+    almanacWrap.addView(metrics, new LinearLayout.LayoutParams(-1, -2));
+    root.addView(almanacWrap);
+
     LinearLayout content = new LinearLayout(this);
     wideLayout = getResources().getConfiguration().screenWidthDp >= 720;
     content.setOrientation(wideLayout ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
@@ -376,7 +398,8 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
     LinearLayout tools = new LinearLayout(this);
     tools.setGravity(Gravity.CENTER_VERTICAL);
     Button fit = button("Fit city", () -> map.resetCamera());
-    tools.addView(fit, new LinearLayout.LayoutParams(dp(70), dp(44)));
+    fit.setBackground(medallionShape(0xee1c304b, 0xee111f33, 0x77edbb73, 14));
+    tools.addView(fit, new LinearLayout.LayoutParams(dp(70), dp(42)));
     streetButton =
         button(
             "Streets",
@@ -384,7 +407,8 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
               map.toggleStreets();
               updateHud(true);
             });
-    LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(dp(75), dp(44));
+    streetButton.setBackground(medallionShape(0xee1c304b, 0xee111f33, 0x77edbb73, 14));
+    LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(dp(74), dp(42));
     sp.leftMargin = dp(5);
     tools.addView(streetButton, sp);
     autoButton =
@@ -395,44 +419,72 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
               game.message = "Auto dispatch " + (game.autoDispatch ? "enabled" : "disabled") + ".";
               actionDone();
             });
-    LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(dp(70), dp(44));
+    autoButton.setBackground(medallionShape(0xee1c304b, 0xee111f33, 0x7777d7c8, 14));
+    LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(dp(70), dp(42));
     ap.leftMargin = dp(5);
     tools.addView(autoButton, ap);
     Button goals = button("Goals", () -> panels.overview());
-    LinearLayout.LayoutParams gp = new LinearLayout.LayoutParams(dp(66), dp(44));
+    goals.setBackground(medallionShape(0xee1c304b, 0xee111f33, 0x99edbb73, 14));
+    LinearLayout.LayoutParams gp = new LinearLayout.LayoutParams(dp(66), dp(42));
     gp.leftMargin = dp(5);
     tools.addView(goals, gp);
     FrameLayout.LayoutParams tp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.END);
-    tp.setMargins(dp(10), dp(10), dp(10), 0);
+    tp.setMargins(dp(10), dp(8), dp(10), 0);
     worldPane.addView(tools, tp);
+
     goalBox = vertical();
-    goalBox.setPadding(dp(15), dp(13), dp(15), dp(12));
-    goalBox.setBackground(shape(0xf2142238, 18));
+    goalBox.setPadding(dp(14), dp(11), dp(14), dp(11));
+    goalBox.setBackground(medallionShape(0xf2192b45, 0xf2101d31, 0x99edbb73, 18));
     goalBox.setElevation(dp(7));
-    TextView eyebrow = text("YOUR COMPANY  /  NEXT MOVE", 9, MINT, true);
+    LinearLayout eyebrowRow = new LinearLayout(this);
+    eyebrowRow.setGravity(Gravity.CENTER_VERTICAL);
+    TextView eyebrow = text("ADVISOR  ·  MISSION SCROLL", 9, AMBER, true);
     eyebrow.setLetterSpacing(.12f);
-    goalBox.addView(eyebrow);
-    goalTitle = text("YOUR COMPANY", 17, INK, true);
-    goalTitle.setPadding(0, dp(7), 0, dp(4));
-    goalDetail = text("", 12, MUTED, false);
+    eyebrowRow.addView(eyebrow, new LinearLayout.LayoutParams(0, -2, 1));
+    goalCollapseButton =
+        button(
+            "–",
+            () -> {
+              goalCollapsed = !goalCollapsed;
+              if (goalBody != null) goalBody.setVisibility(goalCollapsed ? View.GONE : View.VISIBLE);
+              goalCollapseButton.setText(goalCollapsed ? "+" : "–");
+            });
+    goalCollapseButton.setMinHeight(dp(26));
+    goalCollapseButton.setPadding(dp(6), dp(2), dp(6), dp(2));
+    LinearLayout.LayoutParams collapseLp = new LinearLayout.LayoutParams(dp(30), dp(26));
+    collapseLp.setMargins(dp(6), 0, 0, 0);
+    goalCollapseButton.setLayoutParams(collapseLp);
+    eyebrowRow.addView(goalCollapseButton);
+    goalBox.addView(eyebrowRow);
+
+    goalTitle = text("YOUR COMPANY", 16, INK, true);
+    goalTitle.setPadding(0, dp(5), 0, dp(3));
     goalBox.addView(goalTitle);
-    goalBox.addView(goalDetail);
+
+    goalBody = vertical();
+    goalDetail = text("", 12, MUTED, false);
+    goalBody.addView(goalDetail);
+    campaignGoalText = text("", 11, MINT, true);
+    campaignGoalText.setPadding(0, dp(4), 0, 0);
+    goalBody.addView(campaignGoalText);
     chapterProgress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
     chapterProgress.setMax(100);
     chapterProgress.setProgressTintList(android.content.res.ColorStateList.valueOf(AMBER));
     chapterProgress.setProgressBackgroundTintList(
         android.content.res.ColorStateList.valueOf(0xff2a3e57));
-    LinearLayout.LayoutParams progressLayout = new LinearLayout.LayoutParams(-1, dp(4));
-    progressLayout.topMargin = dp(9);
-    goalBox.addView(chapterProgress, progressLayout);
+    LinearLayout.LayoutParams progressLayout = new LinearLayout.LayoutParams(-1, dp(5));
+    progressLayout.topMargin = dp(8);
+    goalBody.addView(chapterProgress, progressLayout);
     goalAction = button("Next step", () -> goalPressed());
-    goalBox.addView(goalAction);
+    primary(goalAction);
+    goalBody.addView(goalAction);
+    goalBox.addView(goalBody);
     FrameLayout.LayoutParams goalParams =
         new FrameLayout.LayoutParams(
             dp(Math.min(286, getResources().getConfiguration().screenWidthDp - 26)),
             -2,
             Gravity.TOP | Gravity.START);
-    goalParams.setMargins(dp(12), dp(92), 0, 0);
+    goalParams.setMargins(dp(12), dp(88), 0, 0);
     worldPane.addView(goalBox, goalParams);
     dispatch = vertical();
     dispatch.setPadding(dp(9), dp(6), dp(9), dp(6));
@@ -579,6 +631,12 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
   }
 
   private void updateGoal() {
+    if (campaignGoalText != null) {
+      campaignGoalText.setText(
+          game.gameMode == Game.MODE_TUTORIAL
+              ? "Academy Charter · Complete all 8 steps"
+              : "Victory Goal: " + game.objectiveText());
+    }
     if (game.gameMode == Game.MODE_TUTORIAL) {
       goalTitle.setText(
           game.tutorialStep < 8
@@ -680,19 +738,29 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
     for (Game.Ride ride : new ArrayList<>(game.requests)) {
       LinearLayout ticket = vertical();
       ticket.setPadding(dp(13), dp(11), dp(13), dp(10));
-      ticket.setBackground(shape(0xf2142238, 15));
+      ticket.setBackground(medallionShape(0xf21b2d47, 0xf2111e32, ride.kindColor(), 15));
       LinearLayout badge = new LinearLayout(this);
+      badge.setGravity(Gravity.CENTER_VERTICAL);
       TextView category = text(ride.kindName(), 9, ride.kindColor(), true);
       category.setLetterSpacing(.10f);
       badge.addView(category, new LinearLayout.LayoutParams(0, -2, 1));
-      badge.addView(text(Game.money(ride.fare), 12, AMBER, true));
+      long netRev = game.estimatedIncome(ride);
+      badge.addView(text("+" + Game.money(netRev), 13, MINT, true));
       ticket.addView(badge);
       TextView origin = text(game.districts.get(ride.from).name, 15, INK, true);
-      origin.setPadding(0, dp(7), 0, dp(2));
+      origin.setPadding(0, dp(6), 0, dp(2));
       origin.setSingleLine(true);
       origin.setEllipsize(android.text.TextUtils.TruncateAt.END);
       ticket.addView(origin);
-      TextView destination = text("→ " + game.districts.get(ride.to).name, 12, MUTED, false);
+      TextView destination =
+          text(
+              "→ "
+                  + game.districts.get(ride.to).name
+                  + " · Tariff "
+                  + Game.money(ride.fare),
+              11,
+              MUTED,
+              false);
       destination.setSingleLine(true);
       destination.setEllipsize(android.text.TextUtils.TruncateAt.END);
       ticket.addView(destination);
@@ -713,6 +781,7 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
                 game.dispatch(ride.id);
                 actionDone();
               });
+      primary(send);
       send.setContentDescription(
           "Dispatch trip from "
               + game.districts.get(ride.from).name
@@ -729,7 +798,7 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
         ticket.setFocusable(true);
         ticket.setContentDescription(send.getContentDescription());
       }
-      LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(dp(246), -2);
+      LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(dp(248), -2);
       p.rightMargin = dp(9);
       row.addView(ticket, p);
     }
@@ -771,20 +840,41 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
         });
     dialog.setOnCancelListener(
         d -> {
-          if (home) main.post(() -> showHome(saves.exists()));
+          if (home) showHome(saves.exists());
         });
     dialog.setCanceledOnTouchOutside(false);
     dialog.show();
   }
 
   void confirm(String title, String body, Runnable action) {
-    showPaused(
+    AlertDialog dialog =
         new AlertDialog.Builder(this)
             .setTitle(title)
             .setMessage(body)
             .setPositiveButton("Continue", (d, w) -> action.run())
-            .setNegativeButton("Cancel", null)
-            .create());
+            .setNegativeButton(
+                "Cancel",
+                (d, w) -> {
+                  if (home) showHome(saves.exists());
+                })
+            .create();
+    showPaused(dialog);
+    Button pos = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+    if (pos != null) {
+      pos.setOnClickListener(
+          v -> {
+            dismissCurrent();
+            action.run();
+          });
+    }
+    Button neg = dialog.getButton(AlertDialog.BUTTON_NEGATIVE);
+    if (neg != null) {
+      neg.setOnClickListener(
+          v -> {
+            dismissCurrent();
+            if (home) showHome(saves.exists());
+          });
+    }
   }
 
   void showReport(Game.Report r) {
@@ -819,6 +909,30 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
       link.setTextColor(BG);
       link.setBackground(shape(0xffd0d9bb, 8));
       paper.addView(link);
+    }
+    if (game.cash >= 250) {
+      Button edict =
+          button(
+              "Executive Response: Fleet & Hospitality Drive (-250 cr)",
+              () -> {
+                if (game.cash >= 250) {
+                  game.cash -= 250;
+                  game.expenses += 250;
+                  for (Game.Taxi t : game.taxis) {
+                    t.cleanliness = Math.min(100.0, t.cleanliness + 20.0);
+                    t.condition = Math.min(100.0, t.condition + 15.0);
+                    t.broken = t.condition < 25.0;
+                  }
+                  for (Game.Driver d : game.drivers) d.fatigue = Math.max(0.0, d.fatigue - 25.0);
+                  game.rating = Math.min(5.0, game.rating + 0.04);
+                  game.message = "Executive drive completed: fleet polished & drivers refreshed.";
+                }
+                dismissCurrent();
+                actionDone();
+              });
+      edict.setTextColor(0xff1d3124);
+      edict.setBackground(shape(0xffd6dfc2, 10));
+      paper.addView(edict);
     }
     ScrollView scroll = new ScrollView(this);
     Button closeEdition = button("Back to business", this::dismissCurrent);

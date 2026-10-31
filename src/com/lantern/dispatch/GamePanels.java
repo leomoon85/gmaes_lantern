@@ -73,23 +73,48 @@ final class GamePanels {
         "Upgrade next vehicle · " + Game.money(game.taxiUpgradePrice()),
         () -> g().upgradeTaxi());
     intro.addView(ui.button("Business model", () -> models()));
+    float density = ui.getResources().getDisplayMetrics().density;
     for (int i = 0; i < game.taxis.size(); i++) {
       final int index = i;
       Game.Taxi t = game.taxis.get(i);
+      Game.Driver assigned = game.driverFor(t);
+      String driverLine =
+          assigned != null
+              ? "Operator: " + assigned.name + " (Lv" + assigned.level + ")"
+              : (game.isStaffed(t)
+                  ? "Operator: Autonomous AI Drive"
+                  : "⚠ Unstaffed — Recruit a driver in Team");
       LinearLayout c =
           ui.card(
               parent,
               "Vehicle " + t.id + " · " + t.tierName(),
               new String[] {"Available", "Collecting passenger", "On a trip", "Turnaround"}
                       [t.status]
-                  + "\nCondition "
-                  + Math.round(t.condition)
-                  + "% · Clean "
-                  + Math.round(t.cleanliness)
-                  + "%\nComfort level "
+                  + " · "
+                  + driverLine
+                  + "\nComfort Lv"
                   + t.comfortLevel
                   + " · Capacity "
-                  + t.capacity);
+                  + t.capacity
+                  + " pax");
+      int condPct = (int) Math.round(t.condition);
+      int cleanPct = (int) Math.round(t.cleanliness);
+      c.addView(
+          BrandArt.meterRow(
+              ui,
+              "Mechanical Integrity",
+              condPct,
+              condPct >= 70 ? 0xff7ee2b8 : condPct >= 35 ? 0xfff5c472 : 0xffef9078,
+              condPct + "%",
+              density));
+      c.addView(
+          BrandArt.meterRow(
+              ui,
+              "Cabin Cleanliness",
+              cleanPct,
+              cleanPct >= 75 ? 0xff73d6cf : cleanPct >= 50 ? 0xfff5c472 : 0xffef9078,
+              cleanPct + "%",
+              density));
       action(
           c,
           "Service · " + Game.money(game.managers.get(0).hired ? 220 : 300),
@@ -157,17 +182,39 @@ final class GamePanels {
 
   private void hubs(LinearLayout parent) {
     Game game = g();
+    float density = ui.getResources().getDisplayMetrics().density;
     ui.card(parent, "A city that connects", game.openCount() + " / 6 hubs · " + game.trafficName());
     for (int i = 0; i < game.districts.size(); i++) {
       final int index = i;
       Game.District d = game.districts.get(i);
+      StringBuilder facInfo = new StringBuilder();
+      if (d.hasFacility(Game.FAC_MAINT)) facInfo.append(" [Depot]");
+      if (d.hasFacility(Game.FAC_LOUNGE)) facInfo.append(" [VIP Lounge]");
+      if (d.hasFacility(Game.FAC_CARGO)) facInfo.append(" [Cargo Dock]");
+      if (d.hasFacility(Game.FAC_CHARGER)) facInfo.append(" [Fast Charger]");
       LinearLayout c =
           ui.card(
               parent,
-              d.name,
+              d.name + (d.open ? " · " + d.levelName() : ""),
               d.open
-                  ? "Level " + d.level + " · " + d.specialty
-                  : "A new destination for your network");
+                  ? "Level "
+                      + d.level
+                      + " · "
+                      + d.specialty
+                      + (facInfo.length() > 0 ? "\nFacilities:" + facInfo : "")
+                  : "Landmark: " + d.landmark + " · Ready for expansion");
+      if (d.open) {
+        int avgDemand =
+            (d.demandMult[0] + d.demandMult[1] + d.demandMult[2] + d.demandMult[3]) / 4;
+        c.addView(
+            BrandArt.meterRow(
+                ui,
+                "Station Fare Surge",
+                Math.min(100, (avgDemand - 70)),
+                0xfff5c472,
+                avgDemand + "% tariff",
+                density));
+      }
       c.addView(
           ui.button(
               d.open ? "Manage hub" : "Open · " + Game.money(game.districtPrice(i)),
@@ -246,6 +293,7 @@ final class GamePanels {
 
   private void team(LinearLayout parent) {
     Game game = g();
+    float density = ui.getResources().getDisplayMetrics().density;
     LinearLayout intro =
         ui.card(
             parent,
@@ -258,28 +306,47 @@ final class GamePanels {
     for (int i = 0; i < game.drivers.size(); i++) {
       final int index = i;
       Game.Driver d = game.drivers.get(i);
+      String assignedLabel =
+          d.assignedTaxiId > 0 ? "Assigned to Vehicle #" + d.assignedTaxiId : "Standby · Unassigned";
       LinearLayout c =
           ui.card(
               parent,
-              d.name,
-              "Level "
-                  + d.level
+              d.name + " · Lv" + d.level,
+              assignedLabel
                   + " · Skill "
                   + String.format(Locale.US, "%.2f", d.skill)
-                  + " · Fatigue "
-                  + Math.round(d.fatigue)
-                  + "%");
+                  + "★");
+      int fatiguePct = (int) Math.round(d.fatigue);
+      c.addView(
+          BrandArt.meterRow(
+              ui,
+              "Shift Fatigue",
+              fatiguePct,
+              fatiguePct >= 80 ? 0xffef9078 : fatiguePct >= 45 ? 0xfff5c472 : 0xff7ee2b8,
+              fatiguePct + "%",
+              density));
       action(c, "Train · " + Game.money(350L * d.level), () -> g().trainDriver(index));
       action(c, "Rest driver", () -> g().restDriver(index));
     }
+    String[] perks = {
+      "Auto-repairs vehicles < 70% & cuts service cost",
+      "Auto-sanitizes cabins +12% after every trip",
+      "Halves driver shift fatigue accumulation",
+      "Boosts fleet corridor speed by +10%",
+      "Softens negative passenger rating impact by 50%"
+    };
     for (int i = 0; i < game.managers.size(); i++) {
       final int index = i;
       Game.Manager m = game.managers.get(i);
+      String perk = i < perks.length ? perks[i] : "Executive operations bonus";
       LinearLayout c =
           ui.card(
               parent,
-              m.role,
-              m.hired ? "Part of your management team" : "Recruitment · " + Game.money(m.cost));
+              m.role + " · " + m.name,
+              (m.hired
+                      ? "✓ Active in Executive Cabinet · "
+                      : "Recruitment · " + Game.money(m.cost) + " · ")
+                  + perk);
       if (!m.hired) action(c, "Hire manager", () -> g().hireManager(index));
     }
     for (Game.Review r : game.reviews)
@@ -327,6 +394,15 @@ final class GamePanels {
                       + c.owned
                       + "% owned\nFictional exchange · Prices follow this campaign.");
       if (c.merged) continue;
+      float density = ui.getResources().getDisplayMetrics().density;
+      company.addView(
+          BrandArt.meterRow(
+              ui,
+              "Voting Control (60% needed to merge)",
+              c.owned,
+              c.owned >= 60 ? 0xff7ee2b8 : 0xfff5c472,
+              c.owned + "%",
+              density));
       company.addView(
           new PriceGraph(ui, c.priceHistory, c.color),
           new LinearLayout.LayoutParams(-1, ui.dp(55)));

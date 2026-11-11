@@ -60,7 +60,7 @@ dependencies {
 }
 
 tasks.register('compileEngineTests', JavaCompile) {
-    source files('src/com/lantern/dispatch/Game.java','src/com/lantern/dispatch/SaveCodec.java','tests/GameTest.java','tests/SaveCodecTest.java')
+    source files('src/com/lantern/dispatch/Game.java','src/com/lantern/dispatch/SaveCodec.java','src/com/lantern/dispatch/I18n.java','tests/GameTest.java','tests/SaveCodecTest.java')
     classpath=files()
     destinationDirectory=layout.buildDirectory.dir('engine-tests')
     options.encoding='UTF-8'

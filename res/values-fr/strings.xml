@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">Fareforge</string>
+    <string name="hud_title">%1$s · %2$d</string>
+    <string name="hud_metrics">%1$s · %2$.2f ★ · Trajets : %3$d%4$s</string>
+    <string name="planning_paused"> · Pause planification</string>
+    <string name="speed_value">%1$d×</string>
+    <string name="resume_symbol">▶</string>
+    <string name="academy_step">ACADÉMIE · %1$d / 7</string>
+    <string name="academy_graduate">DIPLÔMÉ DE L\'ACADÉMIE</string>
+    <string name="chapter_progress">%1$d / %2$d · Prime %3$s</string>
+    <string name="claim_reward">Réclamer prime</string>
+    <string name="next_step">Étape suivante</string>
+    <string name="campaign_complete">CAMPAGNE TERMINÉE</string>
+    <string name="build_empire">BÂTISSEZ VOTRE EMPIRE</string>
+    <string name="company_overview">Aperçu entreprise</string>
+</resources>

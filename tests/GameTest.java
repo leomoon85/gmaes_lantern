@@ -187,7 +187,11 @@ public class GameTest {
     Game ops = new Game(0);
     ops.cash = 25000;
     check(ops.formatCityMoney(1500).startsWith("₹"), "Bengaluru currency symbol ₹");
-    check(ops.setLanguage("kn") && "kn".equals(ops.language), "Multi-language switch");
+    check(ops.setLanguage("es") && "es".equals(ops.language), "Multi-language switch Spanish");
+    check(I18n.isSupported("es") && I18n.isSupported("ja") && I18n.isSupported("ar"), "Supported global languages");
+    check("Ciudad".equals(I18n.get("es", "tab_city")), "Spanish localization dictionary");
+    check("都市".equals(I18n.get("ja", "tab_city")), "Japanese localization dictionary");
+    check("المدينة".equals(I18n.get("ar", "tab_city")), "Arabic localization dictionary");
     ops.taxis.get(0).condition = 55.0;
     ops.taxis.get(0).cleanliness = 45.0;
     check(ops.serviceTaxi(0) && ops.taxis.get(0).condition == 100.0, "Vehicle mechanical service");

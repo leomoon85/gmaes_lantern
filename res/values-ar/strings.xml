@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">Fareforge</string>
+    <string name="hud_title">%1$s · %2$d</string>
+    <string name="hud_metrics">%1$s · %2$.2f ★ · الرحلات: %3$d%4$s</string>
+    <string name="planning_paused"> · التخطيط متوقف</string>
+    <string name="speed_value">%1$d×</string>
+    <string name="resume_symbol">▶</string>
+    <string name="academy_step">الأكاديمية · %1$d / 7</string>
+    <string name="academy_graduate">خريج الأكاديمية</string>
+    <string name="chapter_progress">%1$d / %2$d · المكافأة %3$s</string>
+    <string name="claim_reward">استلام المكافأة</string>
+    <string name="next_step">الخطوة التالية</string>
+    <string name="campaign_complete">اكتملت الحملة</string>
+    <string name="build_empire">ابنِ إمبراطوريتك</string>
+    <string name="company_overview">نظرة عامة على الشركة</string>
+</resources>

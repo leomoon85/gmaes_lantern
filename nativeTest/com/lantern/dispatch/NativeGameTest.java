@@ -309,6 +309,14 @@ public class NativeGameTest {
     assertEquals("Rajesh", decoded.founderName);
     assertEquals(2, decoded.ventures.size());
     assertEquals(g.founderCash, decoded.founderCash);
+
+    // Verify multi-language switcher
+    dialogButton("Language / Idioma / 言語").performClick();
+    Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+    assertNotNull(dialogButton("Español"));
+    dialogButton("Español").performClick();
+    Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+    assertEquals("es", activity.getPreferences(0).getString("lang", "en"));
   }
 
   private boolean containsBrowser(View view) {

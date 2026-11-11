@@ -60,6 +60,19 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
   private volatile String saveError;
   private Bundle savedMapState;
   private final String[] tabs = {"City", "Fleet", "Hubs", "Team", "Market", "News"};
+
+  String tabLabel(int idx) {
+    String lang = game != null ? game.language : "en";
+    switch (idx) {
+      case 0: return I18n.get(lang, "tab_city");
+      case 1: return I18n.get(lang, "tab_fleet");
+      case 2: return I18n.get(lang, "tab_hubs");
+      case 3: return I18n.get(lang, "tab_team");
+      case 4: return I18n.get(lang, "tab_market");
+      case 5: return I18n.get(lang, "tab_news");
+      default: return tabs[idx];
+    }
+  }
   private final String[] chapters = {
     "Your first regulars",
     "Make room for growth",
@@ -91,6 +104,7 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
     night = getPreferences(0).getBoolean("night", true);
     sound = getPreferences(0).getBoolean("sound", true);
     music = getPreferences(0).getBoolean("music", sound);
+    String savedLang = getPreferences(0).getString("lang", null);
     soundtrack = new BackgroundMusic(this, music);
     soundtrack.setSfxEnabled(sound);
     setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC);
@@ -108,6 +122,7 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
       game = new Game();
       saveError = "The previous save could not be restored. It has been kept on this device.";
     }
+    if (savedLang != null) game.setLanguage(savedLang);
     for (Game.Report report : game.reports) {
       report.title = report.title.replace("Lantern", "Fareforge");
       report.body = report.body.replace("Lantern", "Fareforge");
@@ -532,7 +547,7 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
     nav.setPadding(dp(8), dp(5), dp(8), dp(7));
     for (int i = 0; i < tabs.length; i++) {
       final int index = i;
-      Button item = button(tabs[i], () -> selectTab(index));
+      Button item = button(tabLabel(i), () -> selectTab(index));
       item.setTextSize(10);
       item.setCompoundDrawablePadding(dp(4));
       item.setCompoundDrawablesWithIntrinsicBounds(
@@ -555,6 +570,7 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
     dispatch.setVisibility(tab == 0 ? View.VISIBLE : View.GONE);
     for (int i = 0; i < nav.getChildCount(); i++) {
       Button b = (Button) nav.getChildAt(i);
+      b.setText(tabLabel(i));
       b.setTextColor(i == tab ? BG : MUTED);
       b.setBackground(shape(i == tab ? AMBER : BG, 13));
       b.setCompoundDrawablesWithIntrinsicBounds(
@@ -1272,6 +1288,10 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
               dismissCurrent();
               showHome(canContinue);
             }));
+    page.addView(
+        button(
+            "Language / Idioma / 言語 · " + currentLanguageName(),
+            () -> showLanguageModal(canContinue)));
     if (saveError != null) page.addView(text(saveError, 12, AMBER, false));
     TextView foot =
         text(
@@ -1290,6 +1310,43 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
           if (canContinue) home = false;
           else finish();
         });
+  }
+
+  private String currentLanguageName() {
+    String lang = getPreferences(0).getString("lang", game != null ? game.language : "en");
+    for (int i = 0; i < I18n.SUPPORTED_CODES.length; i++) {
+      if (I18n.SUPPORTED_CODES[i].equalsIgnoreCase(lang)) return I18n.SUPPORTED_NAMES[i];
+    }
+    return "English";
+  }
+
+  void showLanguageModal(boolean canContinue) {
+    LinearLayout list = vertical();
+    String cur = getPreferences(0).getString("lang", game != null ? game.language : "en");
+    for (int i = 0; i < I18n.SUPPORTED_CODES.length; i++) {
+      final String code = I18n.SUPPORTED_CODES[i];
+      final String name = I18n.SUPPORTED_NAMES[i];
+      boolean active = code.equalsIgnoreCase(cur);
+      Button b =
+          button(
+              (active ? "✓ " : "") + name + " (" + code.toUpperCase(Locale.US) + ")",
+              () -> {
+                getPreferences(0).edit().putString("lang", code).apply();
+                if (game != null) game.setLanguage(code);
+                dismissCurrent();
+                updateHud(true);
+                showHome(canContinue);
+              });
+      if (active) primary(b);
+      list.addView(b);
+    }
+    showThemedModal(
+        "GLOBAL LOCALIZATION",
+        "Select Language / Idioma",
+        "Choose your preferred display language for UI labels, metrics, and dialogues.",
+        list,
+        "Back",
+        () -> showHome(canContinue));
   }
 
   private void chooseQuickCity() {

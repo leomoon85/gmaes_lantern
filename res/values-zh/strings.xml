@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">Fareforge</string>
+    <string name="hud_title">%1$s · %2$d</string>
+    <string name="hud_metrics">%1$s · %2$.2f ★ · 趟次: %3$d%4$s</string>
+    <string name="planning_paused"> · 规划暂停中</string>
+    <string name="speed_value">%1$d×</string>
+    <string name="resume_symbol">▶</string>
+    <string name="academy_step">交通学院 · %1$d / 7</string>
+    <string name="academy_graduate">学院毕业</string>
+    <string name="chapter_progress">%1$d / %2$d · 奖励 %3$s</string>
+    <string name="claim_reward">领取奖励</string>
+    <string name="next_step">下一步</string>
+    <string name="campaign_complete">战役完成</string>
+    <string name="build_empire">建立交通帝国</string>
+    <string name="company_overview">公司概览</string>
+</resources>

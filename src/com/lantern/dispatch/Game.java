@@ -501,12 +501,31 @@ public final class Game implements java.io.Serializable {
     }
   }
 
+  public static final int CUE_NONE = 0,
+      CUE_CASH = 1,
+      CUE_INCIDENT = 2,
+      CUE_FANFARE = 3,
+      CUE_NEWS = 4,
+      CUE_DISPATCH = 5;
+
   public int scenarioId = 0;
   public int difficulty = DIFF_MEDIUM;
   public int gameMode = MODE_CITY;
   public int campaignStartYear = 2011, campaignEndYear = 2025;
+  public String founderName = "Founder";
+  public String companyName = "Fareforge Mobility";
+  public int founderEquityPct = 80;
+  public long founderCash = 2500L;
+  public long founderSalaryRate = 350L;
+  public long founderTotalSalary = 0L;
+  public long founderTotalDividends = 0L;
+  public int founderCeoTarget = -1;
+  public String flagshipHiredCeoName = "Vikram Rao";
+  public int pendingSoundCue = 0;
   public final ArrayList<String> seenNews = new ArrayList<>();
   public final ArrayList<Report> reports = new ArrayList<>();
+  public final ArrayList<Venture> ventures = new ArrayList<>();
+  public final ArrayList<CityBranchState> cityStates = new ArrayList<>();
   public int chapter = 0;
   public int quickGoalType = GOAL_WORTH_5CR;
   public int historicalScenarioId = 0;
@@ -671,6 +690,8 @@ public final class Game implements java.io.Serializable {
     public final String name;
     public final int district, color;
     public int price, owned = 0, fleet;
+    public int hubsOpen = 2, corridorLevel = 1, strategy = 0;
+    public String lastAction = "Operating regional line";
     public long cash = 6000, served = 0;
     public boolean merged = false;
     public final ArrayList<Integer> priceHistory = new ArrayList<>();
@@ -686,14 +707,249 @@ public final class Game implements java.io.Serializable {
       this.color = color;
       this.cell = startCell;
       this.targetDistrict = (district + 1) % 6;
+      this.strategy = Math.abs(name.hashCode()) % 3;
       this.path = new int[] {startCell};
       priceHistory.add(price);
+    }
+
+    public String strategyName() {
+      return strategy == 0
+          ? "Fare Undercutter"
+          : strategy == 1 ? "Corridor Builder" : "Fleet Expansionist";
     }
 
     public void recordPrice() {
       priceHistory.add(price);
       if (priceHistory.size() > 18) priceHistory.remove(0);
     }
+  }
+
+  public static final class CityBranchState implements java.io.Serializable {
+    private static final long serialVersionUID = 1L;
+    public int cityId;
+    public final ArrayList<District> districts = new ArrayList<>();
+    public final ArrayList<Taxi> taxis = new ArrayList<>();
+    public final ArrayList<Driver> drivers = new ArrayList<>();
+    public final ArrayList<Company> companies = new ArrayList<>();
+    public final ArrayList<Ride> requests = new ArrayList<>();
+    public final int[] corridorTier = new int[W * H];
+
+    public CityBranchState(int cityId) {
+      this.cityId = cityId;
+    }
+  }
+
+  public static final String[] HIRED_CEO_ROSTER = {
+    "Ananya Sen",
+    "Kenji Sato",
+    "Marcus Vance",
+    "Elena Rostova",
+    "Arjun Mehta",
+    "Clara Sterling"
+  };
+
+  public static final class Venture implements java.io.Serializable {
+    private static final long serialVersionUID = 1L;
+    public String name;
+    public String ceoName = "Ananya Sen";
+    public long ceoSalary = 240L;
+    public int cityId, hubA, hubB, founderEquityPct;
+    public int fleet = 2;
+    public long cash = 3200L, valuation = 8000L, revenue = 0L;
+    public boolean merged = false, sold = false, pendingVote = false;
+    public String voteType = "";
+    public long voteOfferAmount = 0L;
+    public String voteSummary = "";
+    public int cell = 0, at = 0;
+    public double progress = 0;
+    public int[] path;
+
+    public Venture(String name, int cityId, int hubA, int hubB, int founderEquityPct) {
+      this.name = name;
+      this.cityId = cityId;
+      this.hubA = hubA;
+      this.hubB = hubB;
+      this.founderEquityPct = Math.max(20, Math.min(100, founderEquityPct));
+    }
+  }
+
+  public static String hiredCeoNameFor(int index) {
+    return HIRED_CEO_ROSTER[Math.abs(index) % HIRED_CEO_ROSTER.length];
+  }
+
+  public boolean isFounderFlagshipCeo() {
+    return founderCeoTarget == -1;
+  }
+
+  public String flagshipCeoName() {
+    return founderCeoTarget == -1 ? founderName : flagshipHiredCeoName;
+  }
+
+  public String activeFounderCeoCompanyName() {
+    if (founderCeoTarget >= 0 && founderCeoTarget < ventures.size()) {
+      Venture v = ventures.get(founderCeoTarget);
+      if (!v.merged && !v.sold) return v.name;
+    }
+    return companyName;
+  }
+
+  public boolean assignFounderAsCeo(int targetIndex) {
+    if (targetIndex < -1 || targetIndex >= ventures.size()) return false;
+    if (targetIndex >= 0) {
+      Venture target = ventures.get(targetIndex);
+      if (target.merged || target.sold) return false;
+    }
+    // Restore hired professional CEO to whichever company the entrepreneur is leaving
+    if (founderCeoTarget >= 0 && founderCeoTarget < ventures.size()) {
+      ventures.get(founderCeoTarget).ceoName = hiredCeoNameFor(founderCeoTarget);
+    }
+    founderCeoTarget = targetIndex;
+    if (targetIndex == -1) {
+      pendingSoundCue = CUE_CASH;
+      message =
+          founderName
+              + " assumed CEO command of "
+              + companyName
+              + " (1 CEO per company rule enforced).";
+    } else {
+      Venture v = ventures.get(targetIndex);
+      v.ceoName = founderName;
+      pendingSoundCue = CUE_CASH;
+      message =
+          founderName
+              + " is now CEO of "
+              + v.name
+              + ". "
+              + flagshipHiredCeoName
+              + " appointed Acting CEO of "
+              + companyName
+              + ".";
+    }
+    return true;
+  }
+
+  public boolean setFounderSalary(long rate) {
+    founderSalaryRate = Math.max(100L, Math.min(1000L, rate));
+    message =
+        "Entrepreneur CEO salary set to "
+            + money(founderSalaryRate)
+            + " / quarter (paid by "
+            + activeFounderCeoCompanyName()
+            + ").";
+    return true;
+  }
+
+  public boolean declareCorporateDividend(long totalDistribution) {
+    if (totalDistribution <= 0 || cash < totalDistribution + 1500L) {
+      message =
+          "Need at least "
+              + money(totalDistribution + 1500L)
+              + " in corporate treasury to declare this dividend.";
+      return false;
+    }
+    cash -= totalDistribution;
+    long founderShare = totalDistribution * founderEquityPct / 100L;
+    founderCash += founderShare;
+    founderTotalDividends += founderShare;
+    dividends += founderShare;
+    pendingSoundCue = CUE_CASH;
+    message =
+        companyName
+            + " declared "
+            + money(totalDistribution)
+            + " dividend — "
+            + founderName
+            + " received "
+            + money(founderShare)
+            + " ("
+            + founderEquityPct
+            + "% stake).";
+    return true;
+  }
+
+  public boolean investPersonalCashIntoCompany(long amount) {
+    if (amount <= 0 || founderCash < amount) {
+      message = "Insufficient Entrepreneur personal cash (" + money(founderCash) + ").";
+      return false;
+    }
+    founderCash -= amount;
+    cash += amount;
+    pendingSoundCue = CUE_CASH;
+    message =
+        founderName
+            + " injected "
+            + money(amount)
+            + " personal capital into "
+            + companyName
+            + " treasury.";
+    return true;
+  }
+
+  public long equitySlicePrice() {
+    return Math.max(1800L, companyNetWorth() / 10L);
+  }
+
+  public boolean buybackFounderEquity(boolean usePersonalCash) {
+    if (founderEquityPct >= 100) {
+      message = founderName + " already holds 100% ownership of " + companyName + ".";
+      return false;
+    }
+    long cost = equitySlicePrice();
+    if (usePersonalCash) {
+      if (founderCash < cost) {
+        message = "Need " + money(cost) + " in Entrepreneur personal cash to buy 10% equity.";
+        return false;
+      }
+      founderCash -= cost;
+    } else {
+      if (cash < cost) {
+        message = "Need " + money(cost) + " in corporate cash to repurchase 10% equity.";
+        return false;
+      }
+      spend(cost);
+    }
+    founderEquityPct = Math.min(100, founderEquityPct + 10);
+    pendingSoundCue = CUE_FANFARE;
+    message =
+        "Repurchased 10% equity in "
+            + companyName
+            + " ("
+            + founderName
+            + " now owns "
+            + founderEquityPct
+            + "%).";
+    return true;
+  }
+
+  public boolean issueSecondaryEquity() {
+    if (founderEquityPct <= 30) {
+      message = "Minimum 30% founder voting stake reached in " + companyName + ".";
+      return false;
+    }
+    long proceeds = equitySlicePrice();
+    founderEquityPct -= 10;
+    cash += proceeds;
+    pendingSoundCue = CUE_CASH;
+    message =
+        "Issued 10% secondary equity in "
+            + companyName
+            + " for +"
+            + money(proceeds)
+            + " corporate capital ("
+            + founderEquityPct
+            + "% Founder stake).";
+    return true;
+  }
+
+  public int firstOpenHubIndex() {
+    for (int i = 0; i < districts.size(); i++) if (districts.get(i).open) return i;
+    return 0;
+  }
+
+  public int pollSoundCue() {
+    int c = pendingSoundCue;
+    pendingSoundCue = CUE_NONE;
+    return c;
   }
 
   public Game() {
@@ -716,7 +972,257 @@ public final class Game implements java.io.Serializable {
   public int ownedCompanyCount() {
     int n = 1;
     for (Company c : companies) if (c.merged) n++;
+    for (CityBranchState b : cityStates)
+      if (b.cityId != scenarioId) {
+        for (Company c : b.companies) if (c.merged) n++;
+      }
+    for (Venture v : ventures) if (!v.sold) n++;
     return n;
+  }
+
+  public void configureFounderCompany(
+      String founder, String compName, int equityPct, int startHubA, int startHubB) {
+    if (founder != null && !founder.trim().isEmpty()) this.founderName = founder.trim();
+    if (compName != null && !compName.trim().isEmpty()) this.companyName = compName.trim();
+    this.founderEquityPct = Math.max(20, Math.min(100, equityPct));
+    this.founderCeoTarget = -1;
+    int outsideSoldPct = 100 - this.founderEquityPct;
+    long seedCapitalBonus = (outsideSoldPct / 10) * 1600L;
+    this.cash += seedCapitalBonus;
+
+    if (startHubA >= 0
+        && startHubB >= 0
+        && startHubA < districts.size()
+        && startHubB < districts.size()
+        && startHubA != startHubB) {
+      for (int i = 0; i < districts.size(); i++)
+        districts.get(i).open = (i == startHubA || i == startHubB);
+      Arrays.fill(corridorTier, 0);
+      int[] p = route(districts.get(startHubA).cell(), districts.get(startHubB).cell());
+      if (p != null) for (int c : p) corridorTier[c] = 1;
+      if (!taxis.isEmpty()) {
+        Taxi t0 = taxis.get(0);
+        t0.cell = districts.get(startHubA).cell();
+        t0.path = new int[] {t0.cell};
+        t0.at = 0;
+        t0.routeStops.clear();
+        t0.routeStops.add(startHubA);
+        t0.routeStops.add(startHubB);
+      }
+      requests.clear();
+      createRide(startHubA, startHubB);
+      createRide(startHubB, startHubA);
+    }
+    this.pendingSoundCue = CUE_FANFARE;
+    this.message =
+        this.companyName
+            + " incorporated by CEO "
+            + this.founderName
+            + " ("
+            + this.founderEquityPct
+            + "% Founder Equity"
+            + (seedCapitalBonus > 0 ? ", +" + money(seedCapitalBonus) + " Investor Capital" : "")
+            + ").";
+  }
+
+  public long ventureStartupCost(int cityIdx, int equityPct) {
+    long base = 5500L + (branches[cityIdx] ? 0L : branchPrice(cityIdx) / 2);
+    int pct = Math.max(20, Math.min(100, equityPct));
+    return Math.max(1200L, base * pct / 100L);
+  }
+
+  public boolean foundVenture(String vName, int cityIdx, int hubA, int hubB, int equityPct) {
+    return foundVenture(vName, cityIdx, hubA, hubB, equityPct, false);
+  }
+
+  public boolean foundVenture(
+      String vName, int cityIdx, int hubA, int hubB, int equityPct, boolean usePersonalCash) {
+    if (ventures.size() >= 6) {
+      message = "Maximum of 6 subsidiary ventures reached.";
+      return false;
+    }
+    if (cityIdx < 0 || cityIdx >= SCENARIOS.length) return false;
+    if (hubA == hubB) hubB = (hubA + 1) % 6;
+    int pct = Math.max(20, Math.min(100, equityPct));
+    long founderCost = ventureStartupCost(cityIdx, pct);
+    if (usePersonalCash) {
+      if (founderCash < founderCost) {
+        message =
+            "Need "
+                + money(founderCost)
+                + " in Entrepreneur personal wealth for your "
+                + pct
+                + "% stake.";
+        return false;
+      }
+      founderCash -= founderCost;
+    } else {
+      if (cash < founderCost) {
+        message = "Need " + money(founderCost) + " for your " + pct + "% founder equity stake.";
+        return false;
+      }
+      spend(founderCost);
+    }
+    String cleanName =
+        (vName == null || vName.trim().isEmpty())
+            ? (regions[cityIdx] + " Express #" + (ventures.size() + 2))
+            : vName.trim();
+    if (!branches[cityIdx]) {
+      branches[cityIdx] = true;
+      ensureCityBranchState(cityIdx);
+    }
+    int startCell = 0;
+    int[] initialPath = null;
+    if (cityIdx == scenarioId
+        && hubA >= 0
+        && hubB >= 0
+        && hubA < districts.size()
+        && hubB < districts.size()) {
+      districts.get(hubA).open = true;
+      districts.get(hubB).open = true;
+      startCell = districts.get(hubA).cell();
+      initialPath = route(districts.get(hubA).cell(), districts.get(hubB).cell());
+      if (initialPath != null)
+        for (int cell : initialPath) if (corridorTier[cell] == 0) corridorTier[cell] = 1;
+    } else {
+      CityBranchState bs = ensureCityBranchState(cityIdx);
+      if (hubA >= 0 && hubB >= 0 && hubA < bs.districts.size() && hubB < bs.districts.size()) {
+        bs.districts.get(hubA).open = true;
+        bs.districts.get(hubB).open = true;
+        startCell = bs.districts.get(hubA).cell();
+        initialPath = route(bs.districts.get(hubA).cell(), bs.districts.get(hubB).cell());
+        if (initialPath != null)
+          for (int cell : initialPath) if (bs.corridorTier[cell] == 0) bs.corridorTier[cell] = 1;
+      }
+    }
+    Venture v = new Venture(cleanName, cityIdx, hubA, hubB, pct);
+    v.ceoName = hiredCeoNameFor(ventures.size());
+    v.cell = startCell;
+    v.path = initialPath != null ? initialPath : new int[] {startCell};
+    v.at = 0;
+    v.progress = 0;
+    ventures.add(v);
+    pendingSoundCue = CUE_FANFARE;
+    message =
+        "Founded "
+            + cleanName
+            + " in "
+            + regions[cityIdx]
+            + " ("
+            + pct
+            + "% Founder Stake · CEO: "
+            + v.ceoName
+            + ").";
+    return true;
+  }
+
+  public boolean callVentureVote(int index, boolean sellProposal) {
+    if (index < 0 || index >= ventures.size()) return false;
+    Venture v = ventures.get(index);
+    if (v.merged || v.sold) return false;
+    v.pendingVote = true;
+    v.voteType = sellProposal ? "SELL" : "MERGE";
+    v.voteOfferAmount =
+        sellProposal
+            ? Math.round((v.valuation + v.cash) * 1.25)
+            : Math.round((100 - v.founderEquityPct) * (v.valuation / 100.0));
+    v.voteSummary =
+        sellProposal
+            ? "Acquirer offers "
+                + money(v.voteOfferAmount)
+                + " to buy 100% of "
+                + v.name
+                + " (Entrepreneur's "
+                + v.founderEquityPct
+                + "% payout: "
+                + money(v.voteOfferAmount * v.founderEquityPct / 100L)
+                + ")."
+            : "Consolidate "
+                + v.name
+                + " fleet & hubs into "
+                + companyName
+                + " (Minority buyout cost: "
+                + money(v.voteOfferAmount)
+                + ").";
+    pendingSoundCue = CUE_NEWS;
+    message = "Board vote scheduled for " + v.name + ".";
+    return true;
+  }
+
+  public boolean resolveVentureVote(int index, boolean founderVotesYes) {
+    if (index < 0 || index >= ventures.size()) return false;
+    Venture v = ventures.get(index);
+    if (v.merged || v.sold || !v.pendingVote) return false;
+    int outsideStake = 100 - v.founderEquityPct;
+    int outsideYes =
+        "SELL".equals(v.voteType)
+            ? (int) Math.round(outsideStake * 0.75)
+            : (int) Math.round(outsideStake * (rating >= 4.7 ? 0.70 : 0.45));
+    int totalYes = (founderVotesYes ? v.founderEquityPct : 0) + outsideYes;
+    v.pendingVote = false;
+    if (!founderVotesYes || totalYes < 51) {
+      message =
+          "Shareholder Vote ("
+              + totalYes
+              + "% YES): Proposal for "
+              + v.name
+              + " declined by board.";
+      return true;
+    }
+    if (founderCeoTarget == index) {
+      founderCeoTarget = -1;
+    }
+    if ("SELL".equals(v.voteType)) {
+      long payout = v.voteOfferAmount * v.founderEquityPct / 100L;
+      founderCash += payout;
+      founderTotalDividends += payout;
+      cash += payout;
+      revenue += payout;
+      v.sold = true;
+      pendingSoundCue = CUE_FANFARE;
+      message =
+          "Shareholder Vote Passed ("
+              + totalYes
+              + "% YES)! Sold "
+              + v.name
+              + " — "
+              + founderName
+              + " received "
+              + money(payout)
+              + ".";
+      return true;
+    } else {
+      long buyoutCost = v.voteOfferAmount;
+      if (cash < buyoutCost) {
+        message = "Need " + money(buyoutCost) + " cash to buy out minority shareholders for merger.";
+        return false;
+      }
+      spend(buyoutCost);
+      v.merged = true;
+      cash += v.cash;
+      if (v.cityId == scenarioId) {
+        int addFleet = Math.min(v.fleet, MAX_FLEET - taxis.size());
+        for (int i = 0; i < addFleet; i++)
+          taxis.add(new Taxi(taxis.size() + 1, districts.get(v.hubA % districts.size()).cell()));
+        assignAvailableDrivers();
+      } else {
+        CityBranchState bs = ensureCityBranchState(v.cityId);
+        int addFleet = Math.min(v.fleet, MAX_FLEET - bs.taxis.size());
+        int spawnCell =
+            bs.districts.isEmpty() ? 0 : bs.districts.get(v.hubA % bs.districts.size()).cell();
+        for (int i = 0; i < addFleet; i++) bs.taxis.add(new Taxi(bs.taxis.size() + 1, spawnCell));
+      }
+      pendingSoundCue = CUE_FANFARE;
+      message =
+          "Shareholder Vote Passed ("
+              + totalYes
+              + "% YES)! Merged "
+              + v.name
+              + " into "
+              + companyName
+              + ".";
+      return true;
+    }
   }
 
   public int establishedCountryCount() {
@@ -795,6 +1301,8 @@ public final class Game implements java.io.Serializable {
     campaignEndYear = 2025;
     seenNews.clear();
     reports.clear();
+    ventures.clear();
+    cityStates.clear();
     chapter = 0;
     districts.clear();
     taxis.clear();
@@ -802,6 +1310,11 @@ public final class Game implements java.io.Serializable {
     companies.clear();
     Arrays.fill(corridorTier, 0);
     cash = 12000;
+    founderCash = 2500L;
+    founderSalaryRate = 350L;
+    founderTotalSalary = 0L;
+    founderTotalDividends = 0L;
+    founderCeoTarget = -1;
     revenue = 0;
     expenses = 0;
     rides = 0;
@@ -830,233 +1343,7 @@ public final class Game implements java.io.Serializable {
     Arrays.fill(branches, false);
     branches[scenarioId] = true;
 
-    if (scenarioId == 1) {
-      districts.add(
-          new District("Westminster", "Central London", "Gov & PAX", 5, 4, 0xffffc566, true));
-      districts.add(
-          new District(
-              "Canary Wharf",
-              "Docklands Finance",
-              "Financial VIP & Mail",
-              15,
-              4,
-              0xff73d6cf,
-              true));
-      districts.add(
-          new District(
-              "Heathrow Gate", "West Air Hub", "Air Cargo & PAX", 25, 4, 0xffb4a0e5, false));
-      districts.add(
-          new District(
-              "King's Cross",
-              "North Rail Terminus",
-              "Intercity Rail & Goods",
-              5,
-              16,
-              0xffe89b7c,
-              false));
-      districts.add(
-          new District(
-              "Southwark Bank", "South Thames Hub", "Commuter PAX", 15, 16, 0xff93c5a1, false));
-      districts.add(
-          new District(
-              "Greenwich Pier", "Thames East Port", "Maritime Freight", 25, 16, 0xff83bce4, false));
-      companies.add(new Company("ThamesLine PLC", 55, 3, 3, 0xffe89b7c, districts.get(3).cell()));
-      companies.add(
-          new Company("Docklands Express", 70, 4, 2, 0xff83bce4, districts.get(2).cell()));
-      companies.add(new Company("Albion Mobility", 45, 2, 5, 0xffb4a0e5, districts.get(5).cell()));
-    } else if (scenarioId == 2) {
-      districts.add(
-          new District(
-              "Midtown Core", "Manhattan Hub", "VIP & Mail Supply", 5, 4, 0xffffc566, true));
-      districts.add(
-          new District(
-              "Wall Street", "Financial District", "Executive & Mail", 15, 4, 0xff73d6cf, true));
-      districts.add(
-          new District(
-              "Queens JFK", "Airport Express", "Air Cargo & PAX", 25, 4, 0xffb4a0e5, false));
-      districts.add(
-          new District(
-              "Jersey Terminal", "Hudson Freight", "Industrial Goods", 5, 16, 0xffe89b7c, false));
-      districts.add(
-          new District(
-              "Brooklyn Navy", "East River Hub", "Commuter & Tech", 15, 16, 0xff93c5a1, false));
-      districts.add(
-          new District(
-              "Bronx Concourse", "North Corridor", "Metro Commuters", 25, 16, 0xff83bce4, false));
-      companies.add(
-          new Company("Hudson Transit Corp", 55, 3, 3, 0xffe89b7c, districts.get(3).cell()));
-      companies.add(new Company("Gotham Skyway", 70, 4, 2, 0xff83bce4, districts.get(2).cell()));
-      companies.add(new Company("Tri-Borough Line", 45, 2, 5, 0xffb4a0e5, districts.get(5).cell()));
-    } else if (scenarioId == 3) {
-      districts.add(
-          new District(
-              "Shinjuku Core", "West Skyscraper Ward", "High-Volume PAX", 5, 4, 0xffffc566, true));
-      districts.add(
-          new District(
-              "Akihabara Tech",
-              "Electric Town",
-              "Precision Tech Freight",
-              15,
-              4,
-              0xff73d6cf,
-              true));
-      districts.add(
-          new District(
-              "Haneda Skyport", "Bay Airport", "Air Express & PAX", 25, 4, 0xffb4a0e5, false));
-      districts.add(
-          new District(
-              "Shinagawa Rail",
-              "Shinkansen Hub",
-              "Bullet Freight & Mail",
-              5,
-              16,
-              0xffe89b7c,
-              false));
-      districts.add(
-          new District(
-              "Shibuya Crossing",
-              "Commercial Ward",
-              "Retail & Commuters",
-              15,
-              16,
-              0xff93c5a1,
-              false));
-      districts.add(
-          new District(
-              "Odaiba Waterfront",
-              "Tokyo Bay Island",
-              "Port & Expo Line",
-              25,
-              16,
-              0xff83bce4,
-              false));
-      companies.add(new Company("Edokko Maglev", 55, 3, 3, 0xffe89b7c, districts.get(3).cell()));
-      companies.add(new Company("Kanto Bay Line", 70, 4, 2, 0xff83bce4, districts.get(2).cell()));
-      companies.add(new Company("Sakura Shuttle", 45, 2, 5, 0xffb4a0e5, districts.get(5).cell()));
-    } else if (scenarioId == 4) {
-      districts.add(
-          new District("Market Street", "Downtown", "Commuters & parcels", 5, 4, 0xffffc566, true));
-      districts.add(
-          new District("SoMa", "Technology district", "Executive travel", 15, 4, 0xff73d6cf, true));
-      districts.add(
-          new District(
-              "SFO Airport", "Peninsula gateway", "Airport transfers", 25, 4, 0xffb4a0e5, false));
-      districts.add(
-          new District(
-              "Mission District",
-              "Neighbourhood hub",
-              "Local deliveries",
-              5,
-              16,
-              0xffe89b7c,
-              false));
-      districts.add(
-          new District(
-              "Fisherman's Wharf",
-              "Northern waterfront",
-              "Visitor journeys",
-              15,
-              16,
-              0xff93c5a1,
-              false));
-      districts.add(
-          new District(
-              "Bayview", "Southern district", "Industry & residents", 25, 16, 0xff83bce4, false));
-      companies.add(
-          new Company("Golden Gate Mobility", 55, 3, 3, 0xffe89b7c, districts.get(3).cell()));
-      companies.add(new Company("Bayline Express", 70, 4, 2, 0xff83bce4, districts.get(2).cell()));
-      companies.add(new Company("Pacific Loop", 45, 2, 5, 0xffb4a0e5, districts.get(5).cell()));
-    } else if (scenarioId == 5) {
-      districts.add(
-          new District(
-              "Marina Bay", "Financial Waterfront", "Executive & Mail", 5, 4, 0xffffc566, true));
-      districts.add(
-          new District(
-              "One-North Biopolis",
-              "Research Corridor",
-              "Tech & Biotech",
-              15,
-              4,
-              0xff73d6cf,
-              true));
-      districts.add(
-          new District(
-              "Changi Jewel", "East Air Terminal", "Global Air Cargo", 25, 4, 0xffb4a0e5, false));
-      districts.add(
-          new District(
-              "Tuas Mega Port",
-              "West Container Hub",
-              "Maritime Containers",
-              5,
-              16,
-              0xffe89b7c,
-              false));
-      districts.add(
-          new District(
-              "Orchard Central", "Retail Boulevard", "Commercial PAX", 15, 16, 0xff93c5a1, false));
-      districts.add(
-          new District(
-              "Sentosa Causeway",
-              "Southern Island",
-              "Resort & Shuttle",
-              25,
-              16,
-              0xff83bce4,
-              false));
-      companies.add(
-          new Company("Merlion Autonomous", 55, 3, 3, 0xffe89b7c, districts.get(3).cell()));
-      companies.add(new Company("Strait Skyway", 70, 4, 2, 0xff83bce4, districts.get(2).cell()));
-      companies.add(
-          new Company("Lion City Transit", 45, 2, 5, 0xffb4a0e5, districts.get(5).cell()));
-    } else {
-      districts.add(
-          new District(
-              "K.R. Market", "Central Bengaluru", "Commuters & parcels", 5, 4, 0xffffc566, true));
-      districts.add(
-          new District(
-              "Indiranagar",
-              "Eastern neighbourhood",
-              "Executive journeys",
-              15,
-              4,
-              0xff73d6cf,
-              true));
-      districts.add(
-          new District(
-              "Kempegowda Airport",
-              "Airport corridor",
-              "Airport journeys",
-              25,
-              4,
-              0xffb4a0e5,
-              false));
-      districts.add(
-          new District(
-              "Majestic Station",
-              "Railway interchange",
-              "Bulk Retail Goods",
-              5,
-              16,
-              0xffe89b7c,
-              false));
-      districts.add(
-          new District(
-              "Whitefield", "Technology corridor", "Daily commuters", 15, 16, 0xff93c5a1, false));
-      districts.add(
-          new District(
-              "Koramangala",
-              "Southern neighbourhood",
-              "Local journeys",
-              25,
-              16,
-              0xff83bce4,
-              false));
-      companies.add(
-          new Company("Copperwheel Mobility", 55, 3, 3, 0xffe89b7c, districts.get(3).cell()));
-      companies.add(
-          new Company("Glasswing Transit", 70, 4, 2, 0xff83bce4, districts.get(2).cell()));
-      companies.add(new Company("Violet Loop", 45, 2, 5, 0xffb4a0e5, districts.get(5).cell()));
-    }
+    populateCityTemplate(scenarioId, districts, companies);
 
     int[] starter = route(districts.get(0).cell(), districts.get(1).cell());
     if (starter != null) for (int c : starter) corridorTier[c] = 1;
@@ -1077,6 +1364,301 @@ public final class Game implements java.io.Serializable {
     createRide(1, 0);
     Scenario sc = currentScenario();
     message = sc.city + " Scenario (" + sc.title + "): " + sc.goalText + ".";
+  }
+
+  private void populateCityTemplate(int cityId, List<District> distOut, List<Company> compOut) {
+    distOut.clear();
+    compOut.clear();
+    if (cityId == 1) {
+      distOut.add(
+          new District("Westminster", "Central London", "Gov & PAX", 5, 4, 0xffffc566, true));
+      distOut.add(
+          new District(
+              "Canary Wharf",
+              "Docklands Finance",
+              "Financial VIP & Mail",
+              15,
+              4,
+              0xff73d6cf,
+              true));
+      distOut.add(
+          new District(
+              "Heathrow Gate", "West Air Hub", "Air Cargo & PAX", 25, 4, 0xffb4a0e5, false));
+      distOut.add(
+          new District(
+              "King's Cross",
+              "North Rail Terminus",
+              "Intercity Rail & Goods",
+              5,
+              16,
+              0xffe89b7c,
+              false));
+      distOut.add(
+          new District(
+              "Southwark Bank", "South Thames Hub", "Commuter PAX", 15, 16, 0xff93c5a1, false));
+      distOut.add(
+          new District(
+              "Greenwich Pier", "Thames East Port", "Maritime Freight", 25, 16, 0xff83bce4, false));
+      compOut.add(new Company("ThamesLine PLC", 55, 3, 3, 0xffe89b7c, distOut.get(3).cell()));
+      compOut.add(new Company("Docklands Express", 70, 4, 2, 0xff83bce4, distOut.get(2).cell()));
+      compOut.add(new Company("Albion Mobility", 45, 2, 5, 0xffb4a0e5, distOut.get(5).cell()));
+    } else if (cityId == 2) {
+      distOut.add(
+          new District(
+              "Midtown Core", "Manhattan Hub", "VIP & Mail Supply", 5, 4, 0xffffc566, true));
+      distOut.add(
+          new District(
+              "Wall Street", "Financial District", "Executive & Mail", 15, 4, 0xff73d6cf, true));
+      distOut.add(
+          new District(
+              "Queens JFK", "Airport Express", "Air Cargo & PAX", 25, 4, 0xffb4a0e5, false));
+      distOut.add(
+          new District(
+              "Jersey Terminal", "Hudson Freight", "Industrial Goods", 5, 16, 0xffe89b7c, false));
+      distOut.add(
+          new District(
+              "Brooklyn Navy", "East River Hub", "Commuter & Tech", 15, 16, 0xff93c5a1, false));
+      distOut.add(
+          new District(
+              "Bronx Concourse", "North Corridor", "Metro Commuters", 25, 16, 0xff83bce4, false));
+      compOut.add(new Company("Hudson Transit Corp", 55, 3, 3, 0xffe89b7c, distOut.get(3).cell()));
+      compOut.add(new Company("Gotham Skyway", 70, 4, 2, 0xff83bce4, distOut.get(2).cell()));
+      compOut.add(new Company("Tri-Borough Line", 45, 2, 5, 0xffb4a0e5, distOut.get(5).cell()));
+    } else if (cityId == 3) {
+      distOut.add(
+          new District(
+              "Shinjuku Core", "West Skyscraper Ward", "High-Volume PAX", 5, 4, 0xffffc566, true));
+      distOut.add(
+          new District(
+              "Akihabara Tech",
+              "Electric Town",
+              "Precision Tech Freight",
+              15,
+              4,
+              0xff73d6cf,
+              true));
+      distOut.add(
+          new District(
+              "Haneda Skyport", "Bay Airport", "Air Express & PAX", 25, 4, 0xffb4a0e5, false));
+      distOut.add(
+          new District(
+              "Shinagawa Rail",
+              "Shinkansen Hub",
+              "Bullet Freight & Mail",
+              5,
+              16,
+              0xffe89b7c,
+              false));
+      distOut.add(
+          new District(
+              "Shibuya Crossing",
+              "Commercial Ward",
+              "Retail & Commuters",
+              15,
+              16,
+              0xff93c5a1,
+              false));
+      distOut.add(
+          new District(
+              "Odaiba Waterfront",
+              "Tokyo Bay Island",
+              "Port & Expo Line",
+              25,
+              16,
+              0xff83bce4,
+              false));
+      compOut.add(new Company("Edokko Maglev", 55, 3, 3, 0xffe89b7c, distOut.get(3).cell()));
+      compOut.add(new Company("Kanto Bay Line", 70, 4, 2, 0xff83bce4, distOut.get(2).cell()));
+      compOut.add(new Company("Sakura Shuttle", 45, 2, 5, 0xffb4a0e5, distOut.get(5).cell()));
+    } else if (cityId == 4) {
+      distOut.add(
+          new District("Market Street", "Downtown", "Commuters & parcels", 5, 4, 0xffffc566, true));
+      distOut.add(
+          new District("SoMa", "Technology district", "Executive travel", 15, 4, 0xff73d6cf, true));
+      distOut.add(
+          new District(
+              "SFO Airport", "Peninsula gateway", "Airport transfers", 25, 4, 0xffb4a0e5, false));
+      distOut.add(
+          new District(
+              "Mission District",
+              "Neighbourhood hub",
+              "Local deliveries",
+              5,
+              16,
+              0xffe89b7c,
+              false));
+      distOut.add(
+          new District(
+              "Fisherman's Wharf",
+              "Northern waterfront",
+              "Visitor journeys",
+              15,
+              16,
+              0xff93c5a1,
+              false));
+      distOut.add(
+          new District(
+              "Bayview", "Southern district", "Industry & residents", 25, 16, 0xff83bce4, false));
+      compOut.add(new Company("Golden Gate Mobility", 55, 3, 3, 0xffe89b7c, distOut.get(3).cell()));
+      compOut.add(new Company("Bayline Express", 70, 4, 2, 0xff83bce4, distOut.get(2).cell()));
+      compOut.add(new Company("Pacific Loop", 45, 2, 5, 0xffb4a0e5, distOut.get(5).cell()));
+    } else if (cityId == 5) {
+      distOut.add(
+          new District(
+              "Marina Bay", "Financial Waterfront", "Executive & Mail", 5, 4, 0xffffc566, true));
+      distOut.add(
+          new District(
+              "One-North Biopolis",
+              "Research Corridor",
+              "Tech & Biotech",
+              15,
+              4,
+              0xff73d6cf,
+              true));
+      distOut.add(
+          new District(
+              "Changi Jewel", "East Air Terminal", "Global Air Cargo", 25, 4, 0xffb4a0e5, false));
+      distOut.add(
+          new District(
+              "Tuas Mega Port",
+              "West Container Hub",
+              "Maritime Containers",
+              5,
+              16,
+              0xffe89b7c,
+              false));
+      distOut.add(
+          new District(
+              "Orchard Central", "Retail Boulevard", "Commercial PAX", 15, 16, 0xff93c5a1, false));
+      distOut.add(
+          new District(
+              "Sentosa Causeway",
+              "Southern Island",
+              "Resort & Shuttle",
+              25,
+              16,
+              0xff83bce4,
+              false));
+      compOut.add(new Company("Merlion Autonomous", 55, 3, 3, 0xffe89b7c, distOut.get(3).cell()));
+      compOut.add(new Company("Strait Skyway", 70, 4, 2, 0xff83bce4, distOut.get(2).cell()));
+      compOut.add(new Company("Lion City Transit", 45, 2, 5, 0xffb4a0e5, distOut.get(5).cell()));
+    } else {
+      distOut.add(
+          new District(
+              "K.R. Market", "Central Bengaluru", "Commuters & parcels", 5, 4, 0xffffc566, true));
+      distOut.add(
+          new District(
+              "Indiranagar",
+              "Eastern neighbourhood",
+              "Executive journeys",
+              15,
+              4,
+              0xff73d6cf,
+              true));
+      distOut.add(
+          new District(
+              "Kempegowda Airport",
+              "Airport corridor",
+              "Airport journeys",
+              25,
+              4,
+              0xffb4a0e5,
+              false));
+      distOut.add(
+          new District(
+              "Majestic Station",
+              "Railway interchange",
+              "Bulk Retail Goods",
+              5,
+              16,
+              0xffe89b7c,
+              false));
+      distOut.add(
+          new District(
+              "Whitefield", "Technology corridor", "Daily commuters", 15, 16, 0xff93c5a1, false));
+      distOut.add(
+          new District(
+              "Koramangala",
+              "Southern neighbourhood",
+              "Local journeys",
+              25,
+              16,
+              0xff83bce4,
+              false));
+      compOut.add(
+          new Company("Copperwheel Mobility", 55, 3, 3, 0xffe89b7c, distOut.get(3).cell()));
+      compOut.add(new Company("Glasswing Transit", 70, 4, 2, 0xff83bce4, distOut.get(2).cell()));
+      compOut.add(new Company("Violet Loop", 45, 2, 5, 0xffb4a0e5, distOut.get(5).cell()));
+    }
+  }
+
+  private CityBranchState ensureCityBranchState(int cityId) {
+    for (CityBranchState s : cityStates) if (s.cityId == cityId) return s;
+    CityBranchState s = new CityBranchState(cityId);
+    populateCityTemplate(cityId, s.districts, s.companies);
+    int[] starter = route(s.districts.get(0).cell(), s.districts.get(1).cell());
+    if (starter != null) for (int c : starter) s.corridorTier[c] = 1;
+    s.taxis.add(new Taxi(1, s.districts.get(0).cell()));
+    s.drivers.add(new Driver(1, "Captain #" + (cityId + 1), 4.8, 1));
+    for (int i = 0; i < s.companies.size(); i++) {
+      Company c = s.companies.get(i);
+      int nextDist = (c.district + i + 1) % s.districts.size();
+      c.targetDistrict = nextDist;
+      int[] r = route(c.cell, s.districts.get(nextDist).cell());
+      c.path = r != null ? r : new int[] {c.cell};
+    }
+    cityStates.add(s);
+    return s;
+  }
+
+  private void saveCurrentCityState() {
+    CityBranchState current = ensureCityBranchState(scenarioId);
+    current.districts.clear();
+    current.districts.addAll(districts);
+    current.taxis.clear();
+    current.taxis.addAll(taxis);
+    current.drivers.clear();
+    current.drivers.addAll(drivers);
+    current.companies.clear();
+    current.companies.addAll(companies);
+    current.requests.clear();
+    current.requests.addAll(requests);
+    System.arraycopy(corridorTier, 0, current.corridorTier, 0, corridorTier.length);
+  }
+
+  /** Switch active management view between unlocked city branches (e.g. Bengaluru <-> London). */
+  public boolean switchCity(int targetCity) {
+    if (targetCity < 0 || targetCity >= SCENARIOS.length) return false;
+    if (!branches[targetCity]) {
+      message = "Launch the " + regions[targetCity] + " branch first before managing it.";
+      return false;
+    }
+    if (targetCity == scenarioId) {
+      message = "Currently managing " + regions[targetCity] + " operations.";
+      return true;
+    }
+    saveCurrentCityState();
+    CityBranchState next = ensureCityBranchState(targetCity);
+    this.scenarioId = targetCity;
+    districts.clear();
+    districts.addAll(next.districts);
+    taxis.clear();
+    taxis.addAll(next.taxis);
+    drivers.clear();
+    drivers.addAll(next.drivers);
+    companies.clear();
+    companies.addAll(next.companies);
+    requests.clear();
+    requests.addAll(next.requests);
+    System.arraycopy(next.corridorTier, 0, corridorTier, 0, corridorTier.length);
+    assignAvailableDrivers();
+    if (requests.isEmpty()) {
+      createRide(0, 1);
+      createRide(1, 0);
+    }
+    pendingSoundCue = CUE_DISPATCH;
+    message = "Switched active city management to " + regions[targetCity] + ".";
+    return true;
   }
 
   private void planRivalRoute(Company c, int nextDistrict) {
@@ -1234,7 +1816,14 @@ public final class Game implements java.io.Serializable {
     }
     spend(branchPrice(i));
     branches[i] = true;
-    message = "Launched " + regions[i] + ". Global operations now contribute each quarter.";
+    ensureCityBranchState(i);
+    pendingSoundCue = CUE_FANFARE;
+    message =
+        "Launched "
+            + regions[i]
+            + "! Tap 'Switch to "
+            + regions[i]
+            + "' in Hubs to manage local operations.";
     return true;
   }
 
@@ -1442,10 +2031,11 @@ public final class Game implements java.io.Serializable {
       return false;
     }
     spend(price);
-    Taxi vehicle = new Taxi(taxis.size() + 1, districts.get(0).cell());
+    int hq = firstOpenHubIndex();
+    Taxi vehicle = new Taxi(taxis.size() + 1, districts.get(hq).cell());
     taxis.add(vehicle);
     assignAvailableDrivers();
-    message = "New vehicle ready at " + districts.get(0).name + ".";
+    message = "New vehicle ready at " + districts.get(hq).name + ".";
     return true;
   }
 
@@ -1494,10 +2084,11 @@ public final class Game implements java.io.Serializable {
       return false;
     }
     spend(cost);
+    int hq = firstOpenHubIndex();
     d.open = true;
-    int[] p = route(districts.get(0).cell(), d.cell());
+    int[] p = route(districts.get(hq).cell(), d.cell());
     if (p != null) for (int c : p) if (corridorTier[c] == 0) corridorTier[c] = 1;
-    createRide(i, 0);
+    createRide(i, hq);
     message = "Opened " + d.name + " Station and linked corridor.";
     return true;
   }
@@ -1563,8 +2154,10 @@ public final class Game implements java.io.Serializable {
       }
     long tierTip = ref == null ? 0 : (ref.tier - 1) * 12L + (ref.comfortLevel - 1) * 8L;
     Driver partner = ref == null ? null : driverFor(ref);
+    double ceoBoost = isFounderFlagshipCeo() ? 1.10 : 1.0;
     double serviceFactor =
-        partner == null ? 1 : 1 + (partner.level - 1) * .03 - (partner.fatigue >= 85 ? .1 : 0);
+        (partner == null ? 1 : 1 + (partner.level - 1) * .03 - (partner.fatigue >= 85 ? .1 : 0))
+            * ceoBoost;
     return businessModel == 2
         ? tierTip
         : Math.round(r.fare * (businessModel == 1 ? .40 : .32) * serviceFactor) + tierTip;
@@ -1599,8 +2192,10 @@ public final class Game implements java.io.Serializable {
       int destHubLevel = dest.level;
       long tierTip = (t.tier - 1) * 12L + (t.comfortLevel - 1) * 8L;
       Driver partner = driverFor(t);
+      double ceoBoost = isFounderFlagshipCeo() ? 1.10 : 1.0;
       double serviceFactor =
-          partner == null ? 1 : 1 + (partner.level - 1) * .03 - (partner.fatigue >= 85 ? .1 : 0);
+          (partner == null ? 1 : 1 + (partner.level - 1) * .03 - (partner.fatigue >= 85 ? .1 : 0))
+              * ceoBoost;
       long income =
           businessModel == 2
               ? tierTip
@@ -1827,21 +2422,73 @@ public final class Game implements java.io.Serializable {
     }
   }
 
+  public int cityFleetCount(int cityIdx) {
+    if (cityIdx == scenarioId) return taxis.size();
+    for (CityBranchState b : cityStates) if (b.cityId == cityIdx) return b.taxis.size();
+    return branches[cityIdx] ? 1 : 0;
+  }
+
+  public int globalFleetCount() {
+    int total = taxis.size();
+    for (CityBranchState b : cityStates) if (b.cityId != scenarioId) total += b.taxis.size();
+    return total;
+  }
+
+  public int globalOpenHubCount() {
+    int total = openCount();
+    for (CityBranchState b : cityStates)
+      if (b.cityId != scenarioId) {
+        for (District d : b.districts) if (d.open) total++;
+      }
+    return total;
+  }
+
+  public int globalHubLevelCount() {
+    int total = totalHubLevels();
+    for (CityBranchState b : cityStates)
+      if (b.cityId != scenarioId) {
+        for (District d : b.districts) if (d.open) total += (d.level - 1);
+      }
+    return total;
+  }
+
   public long portfolioValue() {
     long n = 0;
     for (Company c : companies) if (!c.merged) n += (long) c.price * c.owned;
+    for (CityBranchState b : cityStates)
+      if (b.cityId != scenarioId) {
+        for (Company c : b.companies) if (!c.merged) n += (long) c.price * c.owned;
+      }
     return n;
   }
 
-  public long netWorth() {
+  public long ventureEquityValue() {
+    long total = 0;
+    for (Venture v : ventures)
+      if (!v.merged && !v.sold) {
+        total += (v.valuation + v.cash) * v.founderEquityPct / 100L;
+      }
+    return total;
+  }
+
+  public long companyNetWorth() {
     return cash
         + portfolioValue()
         - marginDebt
         - bondDebt()
-        + taxis.size() * 1500L
-        + openCount() * 2000L
-        + totalHubLevels() * 1800L
+        + globalFleetCount() * 1500L
+        + globalOpenHubCount() * 2000L
+        + globalHubLevelCount() * 1800L
         + (branchCount() - 1) * 4000L;
+  }
+
+  public long entrepreneurNetWorth() {
+    long flagshipEquity = Math.max(0L, companyNetWorth()) * founderEquityPct / 100L;
+    return founderCash + flagshipEquity + ventureEquityValue();
+  }
+
+  public long netWorth() {
+    return companyNetWorth() + ventureEquityValue();
   }
 
   public double equityRatio() {
@@ -1935,10 +2582,12 @@ public final class Game implements java.io.Serializable {
     assignAvailableDrivers();
     cash += c.cash + (c.fleet - inherited) * 1500L;
     districts.get(c.district).open = true;
-    int[] p = route(districts.get(0).cell(), districts.get(c.district).cell());
+    int hq = firstOpenHubIndex();
+    int[] p = route(districts.get(hq).cell(), districts.get(c.district).cell());
     if (p != null) for (int cell : p) if (corridorTier[cell] == 0) corridorTier[cell] = 1;
     c.owned = 0;
     c.merged = true;
+    pendingSoundCue = CUE_FANFARE;
     message = "Merged " + c.name + ": fleet, corridors, treasury and station integrated.";
     return true;
   }
@@ -1950,7 +2599,9 @@ public final class Game implements java.io.Serializable {
       cash += v - marginDebt;
       marginDebt = 0;
       for (Company c : companies) c.owned = 0;
+      for (CityBranchState b : cityStates) for (Company c : b.companies) c.owned = 0;
       marginCalls++;
+      pendingSoundCue = CUE_INCIDENT;
       message =
           "Margin call: broker liquidated the portfolio. Any shortfall is charged to company cash.";
     }
@@ -1959,6 +2610,7 @@ public final class Game implements java.io.Serializable {
   private void history() {
     if (historyStage == 0 && year() >= 2013) {
       historyStage = 1;
+      pendingSoundCue = CUE_NEWS;
       message =
           "2013: international competition enters "
               + currentScenario().city
@@ -1966,6 +2618,7 @@ public final class Game implements java.io.Serializable {
     }
     if (historyStage == 1 && year() >= 2015) {
       historyStage = 2;
+      pendingSoundCue = CUE_NEWS;
       message =
           "2015: consolidation and commuter lines reshape transit. Vehicle procurement is now 15%"
               + " cheaper.";
@@ -1977,6 +2630,7 @@ public final class Game implements java.io.Serializable {
           c.price = Math.max(5, (int) Math.round(c.price * .48));
           c.recordPrice();
         }
+      pendingSoundCue = CUE_INCIDENT;
       message =
           "2020: lockdown disrupts travel. Scenario demand drops; fictional share prices fall 52%."
               + " Check your margin.";
@@ -1984,13 +2638,34 @@ public final class Game implements java.io.Serializable {
     }
     if (historyStage == 3 && year() >= 2022) {
       historyStage = 4;
+      pendingSoundCue = CUE_FANFARE;
       message = "2022: autonomous & zero-commission pass networks unlock.";
     }
   }
 
   private void market() {
     marketTick++;
-    long regional = Math.round((branchCount() - 1) * 220 * demandFactor());
+    // 1. Background City Branch Earnings (scaled by actual fleet & hubs in each saved city)
+    long regional = 0L;
+    for (int cIdx = 0; cIdx < branches.length; cIdx++) {
+      if (branches[cIdx] && cIdx != scenarioId) {
+        CityBranchState bs = ensureCityBranchState(cIdx);
+        int bOpen = 0;
+        for (District d : bs.districts) if (d.open) bOpen++;
+        regional += Math.round((140L + bs.taxis.size() * 90L + bOpen * 45L) * demandFactor());
+        for (int i = 0; i < bs.companies.size(); i++) {
+          Company c = bs.companies.get(i);
+          if (c.merged) continue;
+          double wave = Math.sin((marketTick + i * 3) * 1.7) * .035;
+          double trend = year() == 2020 ? -.012 : .014;
+          c.price = Math.max(5, (int) Math.round(c.price * (1 + trend + wave)));
+          c.recordPrice();
+          long div = c.owned * (c.cash > 2500 ? 1 : 0);
+          cash += div;
+          dividends += div;
+        }
+      }
+    }
     cash += regional;
     revenue += regional;
     if (businessModel == 2) {
@@ -1998,6 +2673,31 @@ public final class Game implements java.io.Serializable {
       cash += subscription;
       revenue += subscription;
     }
+
+    // 2. CEO Salary Payroll (1 Person = 1 Company CEO Rule)
+    if (founderCeoTarget == -1) {
+      // Entrepreneur is CEO of Flagship Company
+      if (cash >= founderSalaryRate) {
+        spend(founderSalaryRate);
+        founderCash += founderSalaryRate;
+        founderTotalSalary += founderSalaryRate;
+      }
+    } else {
+      // Hired Professional CEO runs Flagship Company
+      long hiredCeoCost = 250L;
+      if (cash >= hiredCeoCost) spend(hiredCeoCost);
+    }
+
+    // 3. Quarterly Flagship Dividend when cash-rich
+    if (cash > 11000L) {
+      long autoDiv = 400L;
+      cash -= autoDiv;
+      long founderCut = autoDiv * founderEquityPct / 100L;
+      founderCash += founderCut;
+      founderTotalDividends += founderCut;
+      dividends += founderCut;
+    }
+
     for (District d : districts)
       if (d.open) {
         for (int k = 0; k < 4; k++) d.demandMult[k] = Math.min(180, d.demandMult[k] + 3);
@@ -2007,7 +2707,7 @@ public final class Game implements java.io.Serializable {
       if (c.merged) continue;
       double wave = Math.sin((marketTick + i * 3) * 1.7) * .035;
       double trend = year() == 2020 ? -.012 : .014;
-      double fundamental = (c.cash + c.fleet * 1800.0) / 100;
+      double fundamental = (c.cash + c.fleet * 1800.0 + c.hubsOpen * 600.0) / 100;
       double valuePull = Math.max(-.025, Math.min(.025, (fundamental / c.price - 1) * .04));
       c.price = Math.max(5, (int) Math.round(c.price * (1 + trend + wave + valuePull)));
       c.recordPrice();
@@ -2015,6 +2715,42 @@ public final class Game implements java.io.Serializable {
       cash += dividend;
       dividends += dividend;
       c.cash -= dividend;
+    }
+    for (int i = 0; i < ventures.size(); i++) {
+      Venture v = ventures.get(i);
+      if (v.merged || v.sold) continue;
+      double ceoMult = (founderCeoTarget == i) ? 1.25 : 1.0;
+      long vRev = Math.round((v.fleet * 220L) * demandFactor() * ceoMult);
+      v.cash += vRev;
+      v.revenue += vRev;
+      // Pay Venture's CEO salary (either Entrepreneur if assigned here, or Hired CEO)
+      if (founderCeoTarget == i) {
+        long sal = Math.min(v.cash, founderSalaryRate);
+        v.cash -= sal;
+        founderCash += sal;
+        founderTotalSalary += sal;
+      } else {
+        long sal = Math.min(v.cash, v.ceoSalary);
+        v.cash -= sal;
+      }
+      v.valuation = Math.max(4000L, v.valuation + vRev / 2);
+      long founderDiv = (vRev * v.founderEquityPct) / 250L;
+      if (founderDiv > 0 && v.cash >= founderDiv) {
+        v.cash -= founderDiv;
+        founderCash += founderDiv;
+        founderTotalDividends += founderDiv;
+        cash += founderDiv;
+        dividends += founderDiv;
+      }
+      if (v.cash >= 2600 && v.fleet < 8) {
+        v.cash -= 1900;
+        v.fleet++;
+        v.valuation += 1600;
+      }
+      if (!v.pendingVote && marketTick % 3 == (i % 3) && v.revenue >= 600) {
+        boolean buyout = (marketTick + i) % 2 == 0;
+        callVentureVote(i, buyout);
+      }
     }
     long interest = (marginDebt + 49) / 50 + bonds * 175L;
     cash -= interest;
@@ -2041,17 +2777,89 @@ public final class Game implements java.io.Serializable {
       marketClock -= 15;
       market();
     }
-    while (competitionClock >= 16) {
-      competitionClock -= 16;
-      for (Company c : companies)
+    while (competitionClock >= 14) {
+      competitionClock -= 14;
+      for (int i = 0; i < companies.size(); i++) {
+        Company c = companies.get(i);
         if (!c.merged) {
-          c.cash += c.fleet * 18;
+          c.cash += c.fleet * 24L + c.hubsOpen * 30L;
           c.served++;
-          if (!requests.isEmpty()) {
-            requests.remove(0);
-            message = c.name + " hauled a waiting load. Expand corridors or acquire the rival.";
+          // Check if AI Rival launches a Hostile Takeover Bid on a player Venture in this city
+          Venture hostileTarget = null;
+          for (Venture v : ventures) {
+            if (!v.merged && !v.sold && !v.pendingVote && v.cityId == scenarioId) {
+              hostileTarget = v;
+              break;
+            }
+          }
+          if (hostileTarget != null && c.cash >= 3400) {
+            c.cash -= 600;
+            hostileTarget.pendingVote = true;
+            hostileTarget.voteType = "SELL";
+            hostileTarget.voteOfferAmount =
+                Math.round((hostileTarget.valuation + hostileTarget.cash) * 1.35);
+            hostileTarget.voteSummary =
+                "HOSTILE TAKEOVER BID: AI Rival "
+                    + c.name
+                    + " offers "
+                    + money(hostileTarget.voteOfferAmount)
+                    + " to acquire "
+                    + hostileTarget.name
+                    + " (Entrepreneur's "
+                    + hostileTarget.founderEquityPct
+                    + "% payout: "
+                    + money(
+                        hostileTarget.voteOfferAmount * hostileTarget.founderEquityPct / 100L)
+                    + ").";
+            c.lastAction = "Launched hostile bid on " + hostileTarget.name;
+            pendingSoundCue = CUE_INCIDENT;
+            message =
+                "HOSTILE BID! AI Rival "
+                    + c.name
+                    + " tabled a takeover offer for "
+                    + hostileTarget.name
+                    + "!";
+          } else if (c.cash >= 2200 && c.fleet < 9 && (c.strategy == 2 || c.fleet < 4)) {
+            c.cash -= 1800;
+            c.fleet++;
+            c.lastAction = "Expanded fleet to " + c.fleet + " vehicles";
+          } else if (c.cash >= 2400 && c.hubsOpen < 6 && c.strategy == 1) {
+            c.cash -= 1900;
+            c.hubsOpen++;
+            c.corridorLevel = Math.min(3, c.corridorLevel + 1);
+            c.lastAction =
+                "Opened Hub #" + c.hubsOpen + " & upgraded Tier " + c.corridorLevel + " track";
+          } else if (c.strategy == 0 && c.cash >= 2600 && !districts.isEmpty()) {
+            c.cash -= 900;
+            District targetD = districts.get(c.district % districts.size());
+            for (int k = 0; k < 4; k++)
+              targetD.demandMult[k] = Math.max(90, targetD.demandMult[k] - 8);
+            c.lastAction = "Launched 20% discount fare war at " + targetD.name;
+            pendingSoundCue = CUE_INCIDENT;
+            message =
+                "FARE WAR! AI Rival "
+                    + c.name
+                    + " slashed fares at "
+                    + targetD.name
+                    + "!";
+          } else if (!requests.isEmpty()) {
+            Ride poached = requests.remove(0);
+            c.cash += poached.fare / 2;
+            c.served++;
+            String hubName = districts.get(poached.from).name;
+            c.lastAction = "Poached waiting load at " + hubName;
+            pendingSoundCue = CUE_INCIDENT;
+            message =
+                "AI Rival "
+                    + c.name
+                    + " ("
+                    + c.fleet
+                    + " fleet) poached a load at "
+                    + hubName
+                    + "!";
           }
         }
+      }
     }
     while (costClock >= 1) {
       costClock--;
@@ -2118,6 +2926,32 @@ public final class Game implements java.io.Serializable {
         }
       }
     }
+    // Move active Subsidiary Venture vehicles along their hubA <-> hubB corridor in the current city
+    for (Venture v : ventures) {
+      if (v.merged || v.sold || v.cityId != scenarioId || districts.size() < 2) continue;
+      int cellA = districts.get(Math.max(0, Math.min(districts.size() - 1, v.hubA))).cell();
+      int cellB = districts.get(Math.max(0, Math.min(districts.size() - 1, v.hubB))).cell();
+      if (v.path == null || v.path.length == 0) {
+        v.cell = cellA;
+        int[] r = route(cellA, cellB);
+        v.path = r != null ? r : new int[] {cellA};
+        v.at = 0;
+      }
+      v.progress += dt * 2.1 * trafficFactor();
+      while (v.progress >= 1) {
+        v.progress--;
+        if (v.at < v.path.length - 1) {
+          v.at++;
+          v.cell = v.path[v.at];
+        } else {
+          int targetCell = (v.cell == cellA) ? cellB : cellA;
+          int[] r = route(v.cell, targetCell);
+          v.path = r != null ? r : new int[] {v.cell};
+          v.at = 0;
+          break;
+        }
+      }
+    }
     if (autoDispatch) {
       for (Taxi vehicle : taxis)
         if (vehicle.status == IDLE && isStaffed(vehicle)) {
@@ -2138,12 +2972,14 @@ public final class Game implements java.io.Serializable {
     if (!scenarioWon && objectiveComplete()) {
       scenarioWon = true;
       cash += 8000;
+      pendingSoundCue = CUE_FANFARE;
       message =
           "Gold Medal in " + sc.city + " (" + sc.title + ")! +8,000 cr scenario bonus awarded.";
     }
     if (!milestone && branchCount() == 6 && taxis.size() >= 10 && rides >= 100) {
       milestone = true;
       cash += 15000;
+      pendingSoundCue = CUE_FANFARE;
       message = "Global network achieved! 15,000 cr growth grant received.";
     }
   }

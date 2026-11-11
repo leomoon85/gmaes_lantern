@@ -1,6 +1,5 @@
 package com.lantern.dispatch;
 
-import android.app.AlertDialog;
 import android.content.Context;
 import android.graphics.*;
 import android.view.*;
@@ -56,13 +55,56 @@ final class GamePanels {
     }
   }
 
+  private void addCitySwitcherBannerIfMultiBranch(LinearLayout parent) {
+    Game game = g();
+    if (game.branchCount() <= 1) return;
+    LinearLayout banner =
+        ui.card(
+            parent,
+            "Active City HQ · " + game.currentScenario().city,
+            "Operating in "
+                + game.branchCount()
+                + " cities across "
+                + game.establishedCountryCount()
+                + " countries. Tap any operating branch below to switch city management.");
+    for (int i = 0; i < game.branches.length; i++) {
+      if (!game.branches[i]) continue;
+      final int cityIdx = i;
+      boolean active = (i == game.scenarioId);
+      Button b =
+          ui.button(
+              (active ? "📍 Managing: " : "✈ Switch to ")
+                  + game.regions[i]
+                  + " ("
+                  + Game.SCENARIOS[i].country
+                  + ")",
+              () -> {
+                if (!active) {
+                  perform(
+                      () -> {
+                        boolean ok = g().switchCity(cityIdx);
+                        if (ok) ui.onCitySwitched();
+                        return ok;
+                      });
+                }
+              });
+      if (active) ui.primary(b);
+      banner.addView(b);
+    }
+  }
+
   private void fleet(LinearLayout parent) {
     Game game = g();
+    addCitySwitcherBannerIfMultiBranch(parent);
     LinearLayout intro =
         ui.card(
             parent,
-            "Your fleet · " + game.taxis.size() + " / 12",
-            game.idleCount() + " available · " + game.modelName());
+            game.companyName + " Fleet · " + game.taxis.size() + " / 12",
+            game.currentScenario().city
+                + " Branch · "
+                + game.idleCount()
+                + " available · "
+                + game.modelName());
     Button buy =
         ui.button(
             "Buy vehicle · " + Game.money(game.taxiPrice()), () -> perform(() -> g().buyTaxi()));
@@ -72,7 +114,7 @@ final class GamePanels {
         intro,
         "Upgrade next vehicle · " + Game.money(game.taxiUpgradePrice()),
         () -> g().upgradeTaxi());
-    intro.addView(ui.button("Business model", () -> models()));
+    intro.addView(ui.button("Business model · " + game.modelName(), () -> models()));
     float density = ui.getResources().getDisplayMetrics().density;
     for (int i = 0; i < game.taxis.size(); i++) {
       final int index = i;
@@ -143,47 +185,58 @@ final class GamePanels {
 
   private void editRoute(int vehicleIndex) {
     Game.Taxi vehicle = g().taxis.get(vehicleIndex);
-    String[] labels = new String[g().districts.size()];
-    boolean[] selected = new boolean[labels.length];
-    for (int i = 0; i < labels.length; i++) {
-      labels[i] = g().districts.get(i).name + (g().districts.get(i).open ? "" : " · Not open");
+    boolean[] selected = new boolean[g().districts.size()];
+    LinearLayout body = ui.vertical();
+    for (int i = 0; i < g().districts.size(); i++) {
+      final int idx = i;
+      Game.District d = g().districts.get(i);
       selected[i] = vehicle.routeStops.contains(i);
+      CheckBox cb = new CheckBox(ui);
+      cb.setText(d.name + (d.open ? " · Level " + d.level : " · Locked Hub"));
+      cb.setTextColor(d.open ? MainActivity.INK : MainActivity.MUTED);
+      cb.setTextSize(13);
+      cb.setEnabled(d.open);
+      cb.setChecked(selected[i]);
+      cb.setPadding(ui.dp(8), ui.dp(8), ui.dp(8), ui.dp(8));
+      cb.setOnCheckedChangeListener((btn, isChecked) -> selected[idx] = isChecked);
+      body.addView(cb);
     }
-    ui.showPaused(
-        new AlertDialog.Builder(ui)
-            .setTitle("Service hubs · Vehicle " + vehicle.id)
-            .setMultiChoiceItems(
-                labels,
-                selected,
-                (dialog, index, checked) -> {
-                  if (checked && !g().districts.get(index).open) {
-                    selected[index] = false;
-                    ((AlertDialog) dialog).getListView().setItemChecked(index, false);
-                  } else selected[index] = checked;
-                })
-            .setPositiveButton(
-                "Apply route",
-                (dialog, which) -> {
-                  int count = 0;
-                  for (boolean value : selected) if (value) count++;
-                  if (count >= 2) {
-                    vehicle.routeStops.clear();
-                    for (int i = 0; i < selected.length; i++)
-                      if (selected[i]) vehicle.routeStops.add(i);
-                    g().message =
-                        "Route updated. Auto dispatch prioritises requests between these hubs.";
-                  } else
-                    g().message = "Choose at least two open hubs. The previous route was kept.";
-                  ui.actionDone();
-                })
-            .setNegativeButton("Cancel", null)
-            .create());
+    Button apply =
+        ui.button(
+            "Apply Line Schedule",
+            () -> {
+              int count = 0;
+              for (boolean v : selected) if (v) count++;
+              if (count >= 2) {
+                vehicle.routeStops.clear();
+                for (int i = 0; i < selected.length; i++)
+                  if (selected[i]) vehicle.routeStops.add(i);
+                g().message = "Route updated. Auto dispatch prioritises these hubs.";
+              } else {
+                g().message = "Choose at least two open hubs. Previous route kept.";
+              }
+              ui.dismissCurrent();
+              ui.actionDone();
+            });
+    ui.primary(apply);
+    body.addView(apply);
+    ui.showThemedModal(
+        "LINE DISPATCH SCHEDULE",
+        "Service Hubs · Vehicle #" + vehicle.id,
+        "Select at least 2 open hubs in " + g().currentScenario().city + " for this vehicle's line.",
+        body,
+        "Cancel",
+        null);
   }
 
   private void hubs(LinearLayout parent) {
     Game game = g();
     float density = ui.getResources().getDisplayMetrics().density;
-    ui.card(parent, "A city that connects", game.openCount() + " / 6 hubs · " + game.trafficName());
+    addCitySwitcherBannerIfMultiBranch(parent);
+    ui.card(
+        parent,
+        game.currentScenario().city + " Network",
+        game.openCount() + " / 6 hubs open · " + game.trafficName());
     for (int i = 0; i < game.districts.size(); i++) {
       final int index = i;
       Game.District d = game.districts.get(i);
@@ -217,7 +270,7 @@ final class GamePanels {
       }
       c.addView(
           ui.button(
-              d.open ? "Manage hub" : "Open · " + Game.money(game.districtPrice(i)),
+              d.open ? "Manage hub & corridors" : "Open Hub · " + Game.money(game.districtPrice(i)),
               () -> {
                 if (d.open) showHub(index);
                 else perform(() -> g().unlock(index));
@@ -226,19 +279,40 @@ final class GamePanels {
     LinearLayout branch =
         ui.card(
             parent,
-            "Beyond this city",
+            "Global Multi-City Operations",
             game.establishedCountryCount()
                 + " countries · "
                 + game.branchCount()
-                + " city branches\nExpansion needs 20 trips and three local hubs.");
+                + " city branches\nLaunch new cities (needs 3 open hubs & 20 rides) or tap any operating city to switch active management.");
     for (int i = 0; i < game.branches.length; i++) {
       final int index = i;
+      boolean operating = game.branches[i];
+      boolean isCurrent = (i == game.scenarioId);
+      String label;
+      if (operating) {
+        label =
+            isCurrent
+                ? "📍 " + game.regions[i] + " · Active City (Managing)"
+                : "✈ Switch to " + game.regions[i] + " · Manage Branch";
+      } else {
+        label = "Launch " + game.regions[i] + " · " + Game.money(game.branchPrice(i));
+      }
       Button b =
           ui.button(
-              game.regions[i]
-                  + (game.branches[i] ? " · Operating" : " · " + Game.money(game.branchPrice(i))),
-              () -> perform(() -> g().expand(index)));
-      b.setEnabled(!game.branches[i]);
+              label,
+              () -> {
+                if (operating) {
+                  perform(
+                      () -> {
+                        boolean ok = g().switchCity(index);
+                        if (ok) ui.onCitySwitched();
+                        return ok;
+                      });
+                } else {
+                  perform(() -> g().expand(index));
+                }
+              });
+      if (isCurrent) ui.primary(b);
       branch.addView(b);
     }
   }
@@ -247,48 +321,90 @@ final class GamePanels {
     Game game = g();
     Game.District d = game.districts.get(index);
     if (!d.open) {
-      ui.showPaused(
-          new AlertDialog.Builder(ui)
-              .setTitle(d.name)
-              .setMessage(
-                  "Connect this destination for " + Game.money(game.districtPrice(index)) + ".")
-              .setPositiveButton("Open hub", (dialog, which) -> perform(() -> g().unlock(index)))
-              .setNegativeButton("Later", null)
-              .create());
+      LinearLayout body = ui.vertical();
+      Button openBtn =
+          ui.button(
+              "Open " + d.name + " · " + Game.money(game.districtPrice(index)),
+              () -> {
+                ui.dismissCurrent();
+                perform(() -> g().unlock(index));
+              });
+      ui.primary(openBtn);
+      body.addView(openBtn);
+      ui.showThemedModal(
+          "NEW STATION CHARTER",
+          d.name,
+          "Landmark: "
+              + d.landmark
+              + "\nSpecialty: "
+              + d.specialty
+              + "\nConnect this destination for "
+              + Game.money(game.districtPrice(index))
+              + ".",
+          body,
+          "Later",
+          null);
       return;
     }
     int[] flags = {Game.FAC_MAINT, Game.FAC_LOUNGE, Game.FAC_CARGO, Game.FAC_CHARGER};
     String[] names = {"Service depot", "Passenger lounge", "Parcel terminal", "Charging station"};
-    ArrayList<String> choices = new ArrayList<>();
-    choices.add(
-        d.level >= 3
-            ? "Hub fully upgraded"
-            : "Upgrade hub · " + Game.money(game.districtUpgradePrice(index)));
-    for (int i = 0; i < flags.length; i++)
-      choices.add(
-          names[i]
-              + (d.hasFacility(flags[i])
-                  ? " · Installed"
-                  : " · " + Game.money(game.facilityPrice(flags[i]))));
-    if (index != 0) {
-      choices.add("Express corridor · " + Game.money(game.corridorLinkCost(0, index, 2)));
-      choices.add("Premium corridor · " + Game.money(game.corridorLinkCost(0, index, 3)));
+    LinearLayout body = ui.vertical();
+    Button upg =
+        ui.button(
+            d.level >= 3
+                ? "✓ Hub at Maximum Level (Lv3 Mega Terminal)"
+                : "Upgrade Hub to Lv"
+                    + (d.level + 1)
+                    + " · "
+                    + Game.money(game.districtUpgradePrice(index)),
+            () -> {
+              ui.dismissCurrent();
+              perform(() -> g().upgradeDistrict(index));
+            });
+    if (d.level < 3) ui.primary(upg);
+    else upg.setEnabled(false);
+    body.addView(upg);
+
+    for (int i = 0; i < flags.length; i++) {
+      final int flag = flags[i];
+      boolean inst = d.hasFacility(flag);
+      Button fb =
+          ui.button(
+              names[i]
+                  + (inst ? " · ✓ Installed" : " · " + Game.money(game.facilityPrice(flag))),
+              () -> {
+                ui.dismissCurrent();
+                perform(() -> g().buildFacility(index, flag));
+              });
+      fb.setEnabled(!inst);
+      body.addView(fb);
     }
-    ui.showPaused(
-        new AlertDialog.Builder(ui)
-            .setTitle(d.name + " · Level " + d.level)
-            .setItems(
-                choices.toArray(new String[0]),
-                (dialog, choice) ->
-                    perform(
-                        () ->
-                            choice == 0
-                                ? g().upgradeDistrict(index)
-                                : choice <= 4
-                                    ? g().buildFacility(index, flags[choice - 1])
-                                    : g().buildCorridor(0, index, choice == 5 ? 2 : 3)))
-            .setNegativeButton("Back", null)
-            .create());
+    int hq = game.firstOpenHubIndex();
+    if (index != hq) {
+      body.addView(
+          ui.button(
+              "Build Express Corridor (Tier 2) · "
+                  + Game.money(game.corridorLinkCost(hq, index, 2)),
+              () -> {
+                ui.dismissCurrent();
+                perform(() -> g().buildCorridor(hq, index, 2));
+              }));
+      body.addView(
+          ui.button(
+              "Build High-Speed Corridor (Tier 3) · "
+                  + Game.money(game.corridorLinkCost(hq, index, 3)),
+              () -> {
+                ui.dismissCurrent();
+                perform(() -> g().buildCorridor(hq, index, 3));
+              }));
+    }
+    ui.showThemedModal(
+        game.currentScenario().city.toUpperCase(Locale.US) + " HUB MANAGEMENT",
+        d.name + " · Level " + d.level,
+        "Specialty: " + d.specialty + " · Upgrade station facilities and arterial corridors.",
+        body,
+        "Close",
+        null);
   }
 
   private void team(LinearLayout parent) {
@@ -297,9 +413,11 @@ final class GamePanels {
     LinearLayout intro =
         ui.card(
             parent,
-            "People behind the journeys",
+            "People behind " + game.companyName,
             game.drivers.size()
-                + " driver partners · "
+                + " driver partners in "
+                + game.currentScenario().city
+                + " · "
                 + String.format(Locale.US, "%.2f", game.rating)
                 + " stars");
     action(intro, "Recruit driver · 450 cr", () -> g().recruitDriver(null));
@@ -312,10 +430,7 @@ final class GamePanels {
           ui.card(
               parent,
               d.name + " · Lv" + d.level,
-              assignedLabel
-                  + " · Skill "
-                  + String.format(Locale.US, "%.2f", d.skill)
-                  + "★");
+              assignedLabel + " · Skill " + String.format(Locale.US, "%.2f", d.skill) + "★");
       int fatiguePct = (int) Math.round(d.fatigue);
       c.addView(
           BrandArt.meterRow(
@@ -355,22 +470,120 @@ final class GamePanels {
 
   private void market(LinearLayout parent) {
     Game game = g();
+    float density = ui.getResources().getDisplayMetrics().density;
+
+    // 1. ENTREPRENEUR / CEO PERSONAL WEALTH LEDGER (Distinct from Company Balance Sheet)
+    LinearLayout entrepreneurCard =
+        ui.card(
+            parent,
+            "👤 Entrepreneur & CEO Ledger · " + game.founderName,
+            "Entrepreneur Net Worth: "
+                + Game.money(game.entrepreneurNetWorth())
+                + " · Personal Cash: "
+                + Game.money(game.founderCash)
+                + "\nActive CEO Seat (1 Co. Limit): "
+                + game.activeFounderCeoCompanyName()
+                + "\nQuarterly CEO Salary: "
+                + Game.money(game.founderSalaryRate)
+                + " / qtr · Total Salary Earned: "
+                + Game.money(game.founderTotalSalary)
+                + "\nPersonal Dividends Earned: "
+                + Game.money(game.founderTotalDividends)
+                + " · Companies Owned: "
+                + game.ownedCompanyCount());
+
+    Button salaryBtn =
+        ui.button(
+            "CEO Salary Tier: "
+                + Game.money(game.founderSalaryRate)
+                + "/qtr (Tap to Change)",
+            () -> {
+              long nextRate =
+                  game.founderSalaryRate == 150L
+                      ? 350L
+                      : game.founderSalaryRate == 350L ? 650L : 150L;
+              g().setFounderSalary(nextRate);
+              ui.actionDone();
+            });
+    entrepreneurCard.addView(salaryBtn);
+
+    if (!game.isFounderFlagshipCeo()) {
+      Button returnCeo =
+          ui.button(
+              "Assume CEO Role at "
+                  + game.companyName
+                  + " (Leave "
+                  + game.activeFounderCeoCompanyName()
+                  + ")",
+              () -> perform(() -> g().assignFounderAsCeo(-1)));
+      ui.primary(returnCeo);
+      entrepreneurCard.addView(returnCeo);
+    }
+
+    action(
+        entrepreneurCard,
+        "Inject 1,500 cr Personal Cash into " + game.companyName,
+        () -> g().investPersonalCashIntoCompany(1500L));
+
+    // 2. CORPORATE BALANCE SHEET (Flagship Company)
     LinearLayout balance =
         ui.card(
             parent,
-            "Company ledger",
-            "Net worth "
-                + Game.money(game.netWorth())
-                + "\nRevenue "
+            "🏛 Corporate Balance Sheet · " + game.companyName,
+            "Active Company CEO: "
+                + game.flagshipCeoName()
+                + (game.isFounderFlagshipCeo()
+                    ? " (Founder-CEO · +10% Fare Efficiency)"
+                    : " (Hired Professional CEO · 250 cr/qtr)")
+                + "\nCompany Net Worth: "
+                + Game.money(game.companyNetWorth())
+                + " · Corporate Treasury: "
+                + Game.money(game.cash)
+                + "\nFounder Ownership: "
+                + game.founderEquityPct
+                + "% · Outside Shareholders: "
+                + (100 - game.founderEquityPct)
+                + "%\nRevenue: "
                 + Game.money(game.revenue)
-                + " · Costs "
+                + " · Expenses: "
                 + Game.money(game.expenses)
-                + "\nMargin debt "
+                + "\nMargin Debt: "
                 + Game.money(game.marginDebt)
-                + "\nBonds "
+                + " · Bonds: "
                 + Game.money(game.bondDebt())
-                + " · Dividends "
+                + " · Dividends Paid: "
                 + Game.money(game.dividends));
+
+    Button createCo =
+        ui.button(
+            "+ Incorporate New Company / Spin-Off Venture", () -> ui.showFoundVentureModal());
+    ui.primary(createCo);
+    balance.addView(createCo);
+
+    action(
+        balance,
+        "Declare 1,000 cr Dividend ("
+            + game.founderEquityPct
+            + "% → "
+            + Game.money(1000L * game.founderEquityPct / 100L)
+            + " to Founder)",
+        () -> g().declareCorporateDividend(1000L));
+
+    if (game.founderEquityPct < 100) {
+      action(
+          balance,
+          "Buy Back 10% Flagship Equity · " + Game.money(game.equitySlicePrice()),
+          () -> g().buybackFounderEquity(false));
+    }
+    if (game.founderEquityPct > 30) {
+      action(
+          balance,
+          "Issue 10% Secondary Equity · +" + Game.money(game.equitySlicePrice()),
+          () -> g().issueSecondaryEquity());
+    }
+
+    balance.addView(
+        ui.button("Rename Flagship Company / Founder", () -> ui.showRenameCompanyModal()));
     action(balance, "Issue bond · +5,000 cr", () -> g().issueBond());
     action(balance, "Repay bond · 5,000 cr", () -> g().repayBond());
     balance.addView(
@@ -380,21 +593,131 @@ final class GamePanels {
               g().repayMargin();
               ui.actionDone();
             }));
+
+    // Entrepreneur's Subsidiary Ventures Section
+    if (!game.ventures.isEmpty()) {
+      ui.card(
+          parent,
+          "Your Entrepreneur Ventures (" + game.ventures.size() + ")",
+          "Each company has 1 dedicated CEO. You can serve as CEO of 1 company at a time (+25% Venture Revenue).");
+      for (int i = 0; i < game.ventures.size(); i++) {
+        final int vIdx = i;
+        Game.Venture v = game.ventures.get(i);
+        boolean founderIsCeoHere = (game.founderCeoTarget == vIdx);
+        String statusLine =
+            v.sold
+                ? "✓ Sold in Buyout"
+                : v.merged
+                    ? "✓ Merged into " + game.companyName
+                    : "Company CEO: "
+                        + v.ceoName
+                        + (founderIsCeoHere
+                            ? " (You · Founder-CEO +25% Rev)"
+                            : " (Hired CEO · " + Game.money(v.ceoSalary) + "/qtr)")
+                        + "\nCity: "
+                        + game.regions[v.cityId]
+                        + " (Hubs #"
+                        + (v.hubA + 1)
+                        + " ↔ #"
+                        + (v.hubB + 1)
+                        + ")\n"
+                        + "Your Equity: "
+                        + v.founderEquityPct
+                        + "% · Co-Investors: "
+                        + (100 - v.founderEquityPct)
+                        + "%\n"
+                        + "Fleet: "
+                        + v.fleet
+                        + " vehicles · Valuation: "
+                        + Game.money(v.valuation)
+                        + " · Cash: "
+                        + Game.money(v.cash);
+        LinearLayout vc = ui.card(parent, "🏢 " + v.name, statusLine);
+        if (v.sold || v.merged) continue;
+        vc.addView(
+            BrandArt.meterRow(
+                ui,
+                "Founder Voting Power",
+                v.founderEquityPct,
+                v.founderEquityPct >= 51 ? 0xff7ee2b8 : 0xfff5c472,
+                v.founderEquityPct + "% Stake",
+                density));
+        if (!founderIsCeoHere) {
+          vc.addView(
+              ui.button(
+                  "Become CEO of "
+                      + v.name
+                      + " (Appoint Hired CEO to "
+                      + game.activeFounderCeoCompanyName()
+                      + ")",
+                  () -> perform(() -> g().assignFounderAsCeo(vIdx))));
+        } else {
+          vc.addView(
+              ui.button(
+                  "Step Down as CEO → Return to " + game.companyName,
+                  () -> perform(() -> g().assignFounderAsCeo(-1))));
+        }
+        if (v.pendingVote) {
+          Button voteBtn =
+              ui.button(
+                  "⚖ Board Vote Pending: " + v.voteType + " Proposal →",
+                  () -> showVentureVoteModal(vIdx));
+          ui.primary(voteBtn);
+          vc.addView(voteBtn);
+        } else {
+          vc.addView(
+              ui.button(
+                  "Propose Merger into " + game.companyName + " (Board Vote)",
+                  () -> {
+                    g().callVentureVote(vIdx, false);
+                    ui.actionDone();
+                    showVentureVoteModal(vIdx);
+                  }));
+          vc.addView(
+              ui.button(
+                  "Solicit Buyout / Sell Company (Board Vote)",
+                  () -> {
+                    g().callVentureVote(vIdx, true);
+                    ui.actionDone();
+                    showVentureVoteModal(vIdx);
+                  }));
+        }
+      }
+    }
+
+    // Active AI Rivals on the Share Market
+    ui.card(
+        parent,
+        game.currentScenario().city + " Stock Exchange & AI Rivals",
+        "AI competitors actively buy vehicles, open hubs, and poach unserved trips. Acquire 60% equity to force a buyout merger.");
     for (int i = 0; i < game.companies.size(); i++) {
       final int index = i;
       Game.Company c = game.companies.get(i);
       LinearLayout company =
           ui.card(
               parent,
-              c.name,
+              c.name + " · [" + c.strategyName() + "]",
               c.merged
-                  ? "Acquired by Fareforge"
+                  ? "✓ Acquired & Merged into " + game.companyName
                   : Game.money(c.price)
-                      + " / share · "
+                      + " / share · You own "
                       + c.owned
-                      + "% owned\nFictional exchange · Prices follow this campaign.");
+                      + "%\n"
+                      + "AI Fleet: "
+                      + c.fleet
+                      + " vehicles · Hubs: "
+                      + c.hubsOpen
+                      + " · Track: Tier "
+                      + c.corridorLevel
+                      + "\n"
+                      + "Trips Hauled: "
+                      + c.served
+                      + " · AI Cash: "
+                      + Game.money(c.cash)
+                      + "\n"
+                      + "⚡ Latest Move: "
+                      + c.lastAction);
       if (c.merged) continue;
-      float density = ui.getResources().getDisplayMetrics().density;
       company.addView(
           BrandArt.meterRow(
               ui,
@@ -422,7 +745,7 @@ final class GamePanels {
       action(company, "Sell 10 shares", () -> g().sellShares(index));
       company.addView(
           ui.button(
-              "Acquire · " + Game.money(game.mergerPrice(index)),
+              "Acquire & Merge · " + Game.money(game.mergerPrice(index)),
               () ->
                   ui.confirm(
                       "Acquire " + c.name + "?",
@@ -453,12 +776,69 @@ final class GamePanels {
               false));
   }
 
+  private void showVentureVoteModal(int ventureIndex) {
+    Game game = g();
+    if (ventureIndex < 0 || ventureIndex >= game.ventures.size()) return;
+    Game.Venture v = game.ventures.get(ventureIndex);
+    int outsideStake = 100 - v.founderEquityPct;
+    int outsideYes =
+        "SELL".equals(v.voteType)
+            ? (int) Math.round(outsideStake * 0.75)
+            : (int) Math.round(outsideStake * (game.rating >= 4.7 ? 0.70 : 0.45));
+    LinearLayout body = ui.vertical();
+    float density = ui.getResources().getDisplayMetrics().density;
+    body.addView(
+        BrandArt.meterRow(
+            ui,
+            "Your Founder Voting Block",
+            v.founderEquityPct,
+            0xffedbb73,
+            v.founderEquityPct + "%",
+            density));
+    body.addView(
+        BrandArt.meterRow(
+            ui,
+            "Co-Investor Projected 'YES' Support",
+            outsideYes,
+            0xff77d7c8,
+            outsideYes + "% / " + outsideStake + "%",
+            density));
+
+    Button voteYes =
+        ui.button(
+            "Vote YES (" + (v.founderEquityPct + outsideYes) + "% Total Approval) — Execute " + v.voteType,
+            () -> {
+              ui.dismissCurrent();
+              perform(() -> g().resolveVentureVote(ventureIndex, true));
+            });
+    ui.primary(voteYes);
+    body.addView(voteYes);
+
+    Button voteNo =
+        ui.button(
+            "Vote NO — Veto / Reject Proposal",
+            () -> {
+              ui.dismissCurrent();
+              perform(() -> g().resolveVentureVote(ventureIndex, false));
+            });
+    body.addView(voteNo);
+
+    ui.showThemedModal(
+        "SHAREHOLDER RESOLUTION VOTE",
+        v.name + " · " + v.voteType + " MOTION",
+        v.voteSummary + "\n\n51% total shareholder approval is required to pass this motion.",
+        body,
+        "Defer Vote",
+        null);
+  }
+
   private void news(LinearLayout parent) {
     ui.card(
         parent,
         "The Mobility Post",
-        "Historical events, dated share observations, and the story of your company. Reading an"
-            + " edition pauses play.");
+        "Historical events, dated share observations, and the story of "
+            + g().companyName
+            + ". Reading an edition pauses play.");
     if (g().reports.isEmpty())
       ui.card(
           parent,
@@ -472,45 +852,106 @@ final class GamePanels {
   }
 
   private void models() {
-    ui.showPaused(
-        new AlertDialog.Builder(ui)
-            .setTitle("Business model")
-            .setSingleChoiceItems(
-                new String[] {
-                  "Commission · retain 32% of fares",
-                  "Corporate commute · retain 40% (2015+)",
-                  "Driver subscription · 80 cr / quarter (2022+)"
-                },
-                g().businessModel,
-                (dialog, index) -> {
-                  dialog.dismiss();
-                  perform(() -> g().setModel(index));
-                })
-            .setNegativeButton("Back", null)
-            .create());
+    String[] labels = {
+      "Commission · retain 32% of fares (Standard)",
+      "Corporate commute · retain 40% during rush hour (Unlocks 2015+)",
+      "Driver subscription · +80 cr / vehicle quarterly (Unlocks 2022+)"
+    };
+    LinearLayout body = ui.vertical();
+    for (int i = 0; i < labels.length; i++) {
+      final int idx = i;
+      Button b =
+          ui.button(
+              (g().businessModel == i ? "✓ " : "") + labels[i],
+              () -> {
+                ui.dismissCurrent();
+                perform(() -> g().setModel(idx));
+              });
+      if (g().businessModel == i) ui.primary(b);
+      body.addView(b);
+    }
+    ui.showThemedModal(
+        "REVENUE ARCHITECTURE",
+        "Select Business Model",
+        "Choose how " + g().companyName + " monetizes trips across its network.",
+        body,
+        "Back",
+        null);
   }
 
   void overview() {
-    ui.showPaused(
-        new AlertDialog.Builder(ui)
-            .setTitle("Your company")
-            .setMessage(
-                g().objectiveText()
-                    + "\n\n"
-                    + g().rides
-                    + " trips · "
-                    + g().taxis.size()
-                    + " vehicles\n"
-                    + g().openCount()
-                    + " hubs · "
-                    + g().ownedCompanyCount()
-                    + " companies\n"
-                    + g().establishedCountryCount()
-                    + " countries\n"
-                    + Game.money(g().netWorth())
-                    + " net worth")
-            .setPositiveButton("Keep building", null)
-            .create());
+    Game game = g();
+    LinearLayout body = ui.vertical();
+    LinearLayout stats = ui.vertical();
+    stats.setPadding(ui.dp(14), ui.dp(12), ui.dp(14), ui.dp(12));
+    stats.setBackground(ui.shape(0xff101d30, 14));
+    stats.addView(
+        ui.text(
+            "👤 ENTREPRENEUR LEDGER ("
+                + game.founderName
+                + ")\n"
+                + "• Entrepreneur Net Worth: "
+                + Game.money(game.entrepreneurNetWorth())
+                + "\n• Personal Bank Cash: "
+                + Game.money(game.founderCash)
+                + "\n• Active CEO Seat (1 Co. Limit): "
+                + game.activeFounderCeoCompanyName()
+                + "\n• CEO Salary: "
+                + Game.money(game.founderSalaryRate)
+                + "/qtr (Earned: "
+                + Game.money(game.founderTotalSalary)
+                + ")\n• Personal Dividends Earned: "
+                + Game.money(game.founderTotalDividends)
+                + "\n\n🏛 COMPANY LEDGER ("
+                + game.companyName
+                + ")\n"
+                + "• Flagship CEO: "
+                + game.flagshipCeoName()
+                + " · Founder Stake: "
+                + game.founderEquityPct
+                + "%\n• Company Net Worth: "
+                + Game.money(game.companyNetWorth())
+                + " · Treasury: "
+                + Game.money(game.cash)
+                + "\n• Global Fleet: "
+                + game.globalFleetCount()
+                + " vehicles · Global Open Hubs: "
+                + game.globalOpenHubCount()
+                + "\n• Owned Companies: "
+                + game.ownedCompanyCount()
+                + " · Countries: "
+                + game.establishedCountryCount(),
+            12,
+            MainActivity.INK,
+            false));
+    body.addView(stats);
+
+    Button newVenture =
+        ui.button(
+            "+ Incorporate Another Company / Venture",
+            () -> {
+              ui.dismissCurrent();
+              ui.showFoundVentureModal();
+            });
+    ui.primary(newVenture);
+    body.addView(newVenture);
+
+    Button renameBtn =
+        ui.button(
+            "✎ Edit Entrepreneur & Company Names",
+            () -> {
+              ui.dismissCurrent();
+              ui.showRenameCompanyModal();
+            });
+    body.addView(renameBtn);
+
+    ui.showThemedModal(
+        "ENTREPRENEUR VS. COMPANY CHARTER",
+        game.founderName + " · " + game.companyName,
+        "Current Objective: " + game.objectiveText(),
+        body,
+        "Keep Building",
+        null);
   }
 
   private static final class PriceGraph extends View {

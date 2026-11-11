@@ -241,6 +241,76 @@ public class NativeGameTest {
     assertNotNull(dialogButton("Learn to play"));
   }
 
+  @Test
+  public void entrepreneurMultiCompanyCitySwitchAndAiCompetition() throws Exception {
+    Game g = new Game(0);
+    g.configureFounderCompany("Rajesh", "Deccan Mobility", 60, 0, 2);
+    assertEquals("Rajesh", g.founderName);
+    assertEquals("Deccan Mobility", g.companyName);
+    assertEquals(60, g.founderEquityPct);
+    assertTrue(g.districts.get(0).open);
+    assertTrue(g.districts.get(2).open);
+    assertEquals(Game.CUE_FANFARE, g.pollSoundCue());
+
+    // Open a 3rd hub and complete 20 rides so we can expand to London (city 1)
+    g.cash = 50000;
+    g.unlock(1);
+    g.rides = 25;
+    assertTrue(g.expand(1));
+    assertTrue(g.branches[1]);
+
+    // Switch active management from Bengaluru (0) to London (1) and back
+    assertTrue(g.switchCity(1));
+    assertEquals(1, g.scenarioId);
+    assertEquals("Westminster", g.districts.get(0).name);
+    g.unlock(2); // Open Heathrow in London
+    assertTrue(g.switchCity(0));
+    assertEquals(0, g.scenarioId);
+    assertEquals("K.R. Market", g.districts.get(0).name);
+    assertTrue(g.switchCity(1));
+    assertTrue("London hub state preserved across city switches", g.districts.get(2).open);
+    g.switchCity(0);
+
+    // Found a 2nd company in Bengaluru (same city, 2 hubs) and a 3rd company in Tokyo (city 3)
+    assertTrue(g.foundVenture("Namma Shuttle", 0, 3, 4, 80));
+    assertTrue(g.foundVenture("Tokyo SkyLine", 3, 0, 1, 60));
+    assertEquals(3, g.ownedCompanyCount());
+    assertTrue(g.branches[3]);
+
+    // Verify 1 Person = 1 Company CEO rule & Entrepreneur vs. Company ledger separation
+    assertTrue(g.isFounderFlagshipCeo());
+    assertEquals("Rajesh", g.flagshipCeoName());
+    assertTrue(g.assignFounderAsCeo(0));
+    assertFalse(g.isFounderFlagshipCeo());
+    assertEquals("Namma Shuttle", g.activeFounderCeoCompanyName());
+    assertEquals("Rajesh", g.ventures.get(0).ceoName);
+
+    long founderCashBeforeDiv = g.founderCash;
+    assertTrue(g.declareCorporateDividend(1000L));
+    assertEquals(founderCashBeforeDiv + 600L, g.founderCash);
+    assertTrue(g.buybackFounderEquity(false));
+    assertEquals(70, g.founderEquityPct);
+    assertTrue(g.companyNetWorth() > 0);
+    assertTrue(g.entrepreneurNetWorth() > 0);
+
+    // Call and pass a shareholder vote to sell Namma Shuttle (returns Rajesh to Flagship CEO)
+    long cashBeforeSale = g.cash;
+    assertTrue(g.callVentureVote(0, true));
+    assertTrue(g.ventures.get(0).pendingVote);
+    assertTrue(g.resolveVentureVote(0, true));
+    assertTrue(g.ventures.get(0).sold);
+    assertTrue(g.cash > cashBeforeSale);
+    assertTrue("Founder returns to Flagship CEO when venture is sold", g.isFounderFlagshipCeo());
+
+    // Verify SaveCodec roundtrip with ventures & multi-city state
+    byte[] encoded = SaveCodec.encode(g);
+    Game decoded = SaveCodec.decode(encoded);
+    assertEquals("Deccan Mobility", decoded.companyName);
+    assertEquals("Rajesh", decoded.founderName);
+    assertEquals(2, decoded.ventures.size());
+    assertEquals(g.founderCash, decoded.founderCash);
+  }
+
   private boolean containsBrowser(View view) {
     if (view.getClass().getName().contains("WebView")) return true;
     if (view instanceof ViewGroup) {

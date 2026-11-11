@@ -139,7 +139,16 @@ public final class SaveCodec {
         g.chapter >= 0 && g.chapter <= 6 && g.tutorialStep >= 0 && g.tutorialStep <= 8,
         "Invalid progression");
     require(
-        g.reports != null && g.reports.size() <= 80 && g.reviews != null && g.reviews.size() <= 12,
+        g.reports != null
+            && g.reports.size() <= 80
+            && g.reviews != null
+            && g.reviews.size() <= 12
+            && g.ventures != null
+            && g.ventures.size() <= 8
+            && g.cityStates != null
+            && g.cityStates.size() <= 6
+            && g.companyName != null
+            && g.founderName != null,
         "Invalid archive");
     for (Game.Report report : g.reports)
       require(

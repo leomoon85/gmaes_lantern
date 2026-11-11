@@ -97,27 +97,32 @@ final class NativeNews {
           new Game.Report(
               "opening",
               today,
-              "A new name on the city streets",
-              "Fareforge has entered "
+              game.companyName + " launches on city streets",
+              game.companyName
+                  + " (founded by "
+                  + game.founderName
+                  + " with "
+                  + game.founderEquityPct
+                  + "% founder equity) has entered "
                   + game.currentScenario().city
-                  + ". A single vehicle is the beginning of a network.",
-              "Serve your first trips, improve the service, then connect another hub. Your"
-                  + " company’s journey is yours to shape.",
+                  + ".",
+              "Serve your first trips, improve the service, then connect another hub or spin off a"
+                  + " second company.",
               "",
-              "Fareforge company desk",
+              game.companyName + " desk",
               "Your campaign"));
     if (game.marginCalls > 0)
       financial(
           game,
           "margin-" + game.marginCalls,
-          "Broker liquidates Fareforge’s shares",
+          "Broker liquidates " + game.companyName + "’s shares",
           "Your portfolio fell below the margin equity requirement. The shares were sold to settle"
               + " borrowing.");
     if (game.restructurings > 0)
       financial(
           game,
           "restructure-" + game.restructurings,
-          "Fareforge enters emergency restructuring",
+          game.companyName + " enters emergency restructuring",
           "Creditors intervened after your operating cash fell too far. Review costs and debt"
               + " before expanding.");
     for (Game.Company company : game.companies)
@@ -125,7 +130,7 @@ final class NativeNews {
         financial(
             game,
             "merger-" + company.name,
-            "Fareforge acquires " + company.name,
+            game.companyName + " acquires " + company.name,
             "The rival’s available fleet, treasury, and hub have been integrated into your"
                 + " company.");
     if (game.scenarioWon)

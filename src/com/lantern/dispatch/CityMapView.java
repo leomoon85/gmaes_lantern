@@ -339,7 +339,7 @@ final class CityMapView extends View {
       }
     }
 
-    // 5. Rival & Player fleets
+    // 5. Rival, Subsidiary Venture & Flagship Player fleets
     for (Game.Company company : game.companies)
       if (!company.merged)
         vehicle(
@@ -351,6 +351,20 @@ final class CityMapView extends View {
             company.color,
             unit * .29f,
             0);
+    for (int vIdx = 0; vIdx < game.ventures.size(); vIdx++) {
+      Game.Venture v = game.ventures.get(vIdx);
+      if (!v.merged && !v.sold && v.cityId == game.scenarioId) {
+        vehicle(
+            canvas,
+            v.cell,
+            v.at,
+            v.path,
+            v.progress,
+            0xffb589ff,
+            unit * .38f,
+            100 + vIdx);
+      }
+    }
     for (Game.Taxi taxi : game.taxis)
       vehicle(
           canvas,

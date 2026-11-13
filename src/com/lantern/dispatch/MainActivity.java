@@ -67,7 +67,7 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
   private AlertDialog currentDialog;
   private volatile String saveError;
   private Bundle savedMapState;
-  private final String[] tabs = {"City", "Fleet", "Hubs", "Team", "Market", "News"};
+  private final String[] tabs = {"City", "Fleet", "Hubs", "Team", "Ledger", "Market", "News"};
 
   String tabLabel(int idx) {
     String lang = game != null ? game.language : "en";
@@ -76,8 +76,9 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
       case 1: return I18n.get(lang, "tab_fleet");
       case 2: return I18n.get(lang, "tab_hubs");
       case 3: return I18n.get(lang, "tab_team");
-      case 4: return I18n.get(lang, "tab_market");
-      case 5: return I18n.get(lang, "tab_news");
+      case 4: return I18n.get(lang, "tab_ledger");
+      case 5: return I18n.get(lang, "tab_market");
+      case 6: return I18n.get(lang, "tab_news");
       default: return tabs[idx];
     }
   }
@@ -101,7 +102,7 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
     "Great! Now upgrade any open station in 'Hubs' to Level 2 for +15% fares.",
     "Let's hire help! Open 'Team' and recruit a Manager to automate upkeep.",
     "Final lesson: Open 'Market' and buy 10 shares in a rival company.",
-    "🎓 Test level complete! +5,000 cr bonus awarded.\nYou're ready to build your mobility empire!"
+    "🎓 Test level complete! +" + Game.money(5000L) + " bonus awarded.\nYou're ready to build your mobility empire!"
   };
 
   @Override
@@ -679,7 +680,7 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
 
   private boolean tutorialTabRelevant(int tabIdx) {
     if (game == null || game.gameMode != Game.MODE_TUTORIAL || game.tutorialStep >= 8) return true;
-    int maxTab = new int[] {0, 0, 0, 1, 2, 2, 3, 4}[Math.max(0, Math.min(7, game.tutorialStep))];
+    int maxTab = new int[] {0, 0, 0, 1, 2, 2, 3, 5}[Math.max(0, Math.min(7, game.tutorialStep))];
     return tabIdx <= maxTab;
   }
 
@@ -694,7 +695,7 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
     for (int i = 0; i < nav.getChildCount(); i++) {
       Button b = (Button) nav.getChildAt(i);
       String label = tabLabel(i);
-      if (i == 5 && unread > 0 && (game == null || game.gameMode != Game.MODE_TUTORIAL))
+      if (i == 6 && unread > 0 && (game == null || game.gameMode != Game.MODE_TUTORIAL))
         label = label + " (" + unread + ")";
       b.setText(label);
       b.setTextColor(i == tab ? BG : MUTED);
@@ -733,7 +734,9 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
     String cityDisplay =
         game.currentScenario().city
             + (game.branchCount() > 1 ? " ▾ (" + game.branchCount() + " Cities)" : "");
-    title.setText(getString(R.string.hud_title, cityDisplay, game.year()));
+    String dateBadge =
+        game.monthName() + " " + game.year() + (tab == 0 ? "" : " · ⏸ Planning");
+    title.setText(getString(R.string.hud_title, cityDisplay, dateBadge));
     soundtrack.updateAtmosphere(game.rushHour(), game.speed, false);
     metrics.setText(
         getString(
@@ -1661,7 +1664,7 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
     if (game.cash >= 250) {
       Button edict =
           button(
-              "Executive Response: Fleet & Hospitality Drive (-250 cr)",
+              "Executive Response: Fleet & Hospitality Drive (-" + Game.money(250L) + ")",
               () -> {
                 if (game.cash >= 250) {
                   game.cash -= 250;
@@ -1774,7 +1777,7 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
             () -> showLanguageModal(canContinue)));
     page.addView(
         button(
-            "🌐 Multiplayer & Cloud Backup (PeerSplit E2EE)",
+            "🌐 Convoy Multiplayer & QR Backup (E2EE)",
             () -> showPeerMultiplayerModal()));
     if (saveError != null) page.addView(text(saveError, 12, AMBER, false));
     TextView foot =
@@ -1848,15 +1851,15 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
   void showPeerMultiplayerModal() {
     LinearLayout body = vertical();
 
-    // 1. PeerSplit Multiplayer Lobby Section
+    // 1. Fareforge Convoy Multiplayer Lobby Section
     LinearLayout multiCard = vertical();
     multiCard.setPadding(dp(14), dp(12), dp(14), dp(12));
     multiCard.setBackground(shape(0xff182b44, 14));
     multiCard.addView(
-        text("🌐 PEERSPLIT P2P MULTIPLAYER ROOM", 15, AMBER, true));
+        text("🌐 FAREFORGE CONVOY MULTIPLAYER", 15, AMBER, true));
     multiCard.addView(
         text(
-            "Host or join a serverless tycoon match. Share an encrypted Room Envelope with a friend to import their real company into your stock market!",
+            "Host or join an offline-first E2EE tycoon match. Share a QR Room Pass with a friend to import their real company into your stock market!",
             12,
             MUTED,
             false));
@@ -1912,9 +1915,9 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
     body.addView(backupCard, bLp);
 
     showThemedModal(
-        "PEERSPLIT MULTIPLAYER & ZERO-SERVER SYNC",
-        "E2EE Decentralized Exchange",
-        "Uses PeerSplit / Nostr end-to-end encrypted protocol. No accounts, no central servers, 100% private.",
+        "FAREFORGE CONVOY & E2EE QR SYNC",
+        "Encrypted Zero-Server Exchange",
+        "Uses Fareforge Convoy AES-256-GCM encryption & QR passes. No accounts, no central servers, 100% private.",
         body,
         "Close",
         null);
@@ -1922,38 +1925,42 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
 
   private void showExportEnvelopeModal(String title, String roomCode, String envelope) {
     LinearLayout body = vertical();
-    body.addView(text("ROOM ACCESS CODE:", 12, AMBER, true));
-    EditText codeView = new EditText(this);
-    codeView.setText(roomCode);
-    codeView.setTextColor(INK);
-    codeView.setBackgroundColor(0xff0b1524);
-    codeView.setTextSize(16);
-    codeView.setEnabled(false);
-    body.addView(codeView);
+    body.addView(text("CONVOY ROOM CODE: " + roomCode, 13, AMBER, true));
 
-    TextView instr = text("Encrypted Peer Envelope (Share this code or text with your rival):", 12, MUTED, false);
-    LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(-1, -2);
-    ip.topMargin = dp(8);
-    body.addView(instr, ip);
-
-    EditText envelopeView = new EditText(this);
-    envelopeView.setText(envelope);
-    envelopeView.setTextColor(MINT);
-    envelopeView.setTextSize(10);
-    envelopeView.setBackgroundColor(0xff09101d);
-    envelopeView.setMaxLines(8);
-    envelopeView.setLines(6);
-    body.addView(envelopeView);
+    String qrPayload =
+        roomCode != null && !roomCode.isEmpty()
+            ? QrCodeHelper.packRoomPayload(roomCode, envelope)
+            : envelope;
+    try {
+      Bitmap qrBmp = QrCodeHelper.encodeQr(qrPayload, dp(220));
+      ImageView qrView = new ImageView(this);
+      qrView.setImageBitmap(qrBmp);
+      qrView.setBackgroundColor(0xffffffff);
+      qrView.setPadding(dp(10), dp(10), dp(10), dp(10));
+      LinearLayout.LayoutParams qp = new LinearLayout.LayoutParams(dp(220), dp(220));
+      qp.gravity = Gravity.CENTER_HORIZONTAL;
+      qp.topMargin = dp(10);
+      qp.bottomMargin = dp(10);
+      body.addView(qrView, qp);
+      body.addView(
+          text(
+              "Have your friend tap 'Scan QR Code with Camera' in Join Room to import instantly.",
+              11,
+              MINT,
+              false));
+    } catch (Exception e) {
+      body.addView(text("QR generation unavailable: " + e.getMessage(), 11, AMBER, false));
+    }
 
     Button copyBtn =
         button(
-            "📋 Copy Room Envelope to Clipboard",
+            "📋 Copy Encrypted Pass (Fallback)",
             () -> {
               android.content.ClipboardManager cb =
                   (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
               if (cb != null) {
-                cb.setPrimaryClip(android.content.ClipData.newPlainText("Fareforge Room", roomCode + "\n" + envelope));
-                Toast.makeText(this, "Copied Room Code & Envelope!", Toast.LENGTH_SHORT).show();
+                cb.setPrimaryClip(android.content.ClipData.newPlainText("Fareforge Convoy", qrPayload));
+                Toast.makeText(this, "Copied Convoy Pass!", Toast.LENGTH_SHORT).show();
               }
             });
     primary(copyBtn);
@@ -1962,68 +1969,338 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
     showThemedModal(
         title,
         "Room: " + roomCode,
-        "Your friend enters this Room Code and envelope to compete against your company in their market.",
+        "Your friend scans this QR code with their mobile camera to compete against your company.",
         body,
         "Done",
         null);
   }
 
+  private Runnable pendingCameraScanAction;
+  private static final int REQ_CAMERA_QR = 7041;
+
+  @Override
+  public void onRequestPermissionsResult(
+      int requestCode, String[] permissions, int[] grantResults) {
+    super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+    if (requestCode == REQ_CAMERA_QR) {
+      if (grantResults.length > 0
+          && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED
+          && pendingCameraScanAction != null) {
+        Runnable run = pendingCameraScanAction;
+        pendingCameraScanAction = null;
+        run.run();
+      } else {
+        pendingCameraScanAction = null;
+        Toast.makeText(this, "Camera permission is required to scan QR codes.", Toast.LENGTH_SHORT)
+            .show();
+      }
+    }
+  }
+
+  @SuppressWarnings("MissingPermission")
+  private void openQrScannerDialog(
+      EditText codeInput, EditText envInput, Runnable onAutoJoin) {
+    if (checkSelfPermission(android.Manifest.permission.CAMERA)
+        != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+      pendingCameraScanAction = () -> openQrScannerDialog(codeInput, envInput, onAutoJoin);
+      requestPermissions(new String[] {android.Manifest.permission.CAMERA}, REQ_CAMERA_QR);
+      return;
+    }
+
+    final android.hardware.camera2.CameraManager camMgr =
+        (android.hardware.camera2.CameraManager) getSystemService(Context.CAMERA_SERVICE);
+    String backCamId = null;
+    try {
+      for (String id : camMgr.getCameraIdList()) {
+        Integer facing =
+            camMgr
+                .getCameraCharacteristics(id)
+                .get(android.hardware.camera2.CameraCharacteristics.LENS_FACING);
+        if (facing != null
+            && facing == android.hardware.camera2.CameraCharacteristics.LENS_FACING_BACK) {
+          backCamId = id;
+          break;
+        }
+      }
+      if (backCamId == null && camMgr.getCameraIdList().length > 0) {
+        backCamId = camMgr.getCameraIdList()[0];
+      }
+    } catch (Exception e) {
+      Toast.makeText(this, "No camera available: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+      return;
+    }
+    if (backCamId == null) {
+      Toast.makeText(this, "No camera found on this device.", Toast.LENGTH_SHORT).show();
+      return;
+    }
+
+    final HandlerThread bgThread = new HandlerThread("ConvoyQrCam");
+    bgThread.start();
+    final Handler bgHandler = new Handler(bgThread.getLooper());
+    final android.hardware.camera2.CameraDevice[] camHolder =
+        new android.hardware.camera2.CameraDevice[1];
+    final android.hardware.camera2.CameraCaptureSession[] sessionHolder =
+        new android.hardware.camera2.CameraCaptureSession[1];
+    final android.hardware.camera2.CaptureRequest.Builder[] reqHolder =
+        new android.hardware.camera2.CaptureRequest.Builder[1];
+    final android.media.ImageReader[] readerHolder = new android.media.ImageReader[1];
+    final boolean[] handled = {false};
+    final boolean[] torchOn = {false};
+
+    LinearLayout scanBox = vertical();
+    scanBox.addView(text("Point camera at friend's Fareforge Convoy QR code", 12, MINT, true));
+    TextureView preview = new TextureView(this);
+    LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(dp(260), dp(260));
+    tp.gravity = Gravity.CENTER_HORIZONTAL;
+    tp.topMargin = dp(8);
+    scanBox.addView(preview, tp);
+
+    final Button torchBtn = button("🔦 Torch: Off", null);
+    torchBtn.setOnClickListener(
+        v -> {
+          if (sessionHolder[0] == null || reqHolder[0] == null) return;
+          torchOn[0] = !torchOn[0];
+          torchBtn.setText(torchOn[0] ? "🔦 Torch: On" : "🔦 Torch: Off");
+          try {
+            reqHolder[0].set(
+                android.hardware.camera2.CaptureRequest.FLASH_MODE,
+                torchOn[0]
+                    ? android.hardware.camera2.CaptureRequest.FLASH_MODE_TORCH
+                    : android.hardware.camera2.CaptureRequest.FLASH_MODE_OFF);
+            sessionHolder[0].setRepeatingRequest(reqHolder[0].build(), null, bgHandler);
+          } catch (Exception ignored) {
+          }
+        });
+    LinearLayout.LayoutParams tbp = new LinearLayout.LayoutParams(-1, -2);
+    tbp.topMargin = dp(8);
+    scanBox.addView(torchBtn, tbp);
+
+    final AlertDialog scanDialog =
+        new AlertDialog.Builder(this)
+            .setTitle("📷 Scan Convoy QR Code")
+            .setView(scanBox)
+            .setNegativeButton("Cancel", null)
+            .create();
+    scanDialog.setOnDismissListener(
+        d -> {
+          if (camHolder[0] != null) {
+            try {
+              camHolder[0].close();
+            } catch (Exception ignored) {
+            }
+          }
+          if (readerHolder[0] != null) {
+            try {
+              readerHolder[0].close();
+            } catch (Exception ignored) {
+            }
+          }
+          bgThread.quitSafely();
+        });
+
+    final String selectedCamId = backCamId;
+    preview.setSurfaceTextureListener(
+        new TextureView.SurfaceTextureListener() {
+          @Override
+          public void onSurfaceTextureAvailable(SurfaceTexture st, int width, int height) {
+            try {
+              st.setDefaultBufferSize(640, 480);
+              Surface previewSurface = new Surface(st);
+              android.media.ImageReader reader =
+                  android.media.ImageReader.newInstance(
+                      640, 480, android.graphics.ImageFormat.YUV_420_888, 2);
+              readerHolder[0] = reader;
+              reader.setOnImageAvailableListener(
+                  r -> {
+                    android.media.Image img = r.acquireLatestImage();
+                    if (img == null) return;
+                    try {
+                      if (handled[0]) return;
+                      android.media.Image.Plane yPlane = img.getPlanes()[0];
+                      java.nio.ByteBuffer buf = yPlane.getBuffer();
+                      int w = img.getWidth();
+                      int h = img.getHeight();
+                      int rowStride = yPlane.getRowStride();
+                      byte[] yData = new byte[w * h];
+                      if (rowStride == w) {
+                        buf.get(yData, 0, w * h);
+                      } else {
+                        byte[] row = new byte[rowStride];
+                        for (int y = 0; y < h; y++) {
+                          buf.position(y * rowStride);
+                          buf.get(row, 0, Math.min(rowStride, buf.remaining()));
+                          System.arraycopy(row, 0, yData, y * w, w);
+                        }
+                      }
+                      String decoded = QrCodeHelper.decodeYuv(yData, w, h);
+                      if (decoded != null && !decoded.isEmpty()) {
+                        handled[0] = true;
+                        runOnUiThread(
+                            () -> {
+                              scanDialog.dismiss();
+                              String[] unpacked = QrCodeHelper.unpackRoomPayload(decoded);
+                              if (unpacked != null) {
+                                codeInput.setText(unpacked[0]);
+                                envInput.setText(unpacked[1]);
+                                onAutoJoin.run();
+                              } else {
+                                envInput.setText(decoded);
+                                Toast.makeText(
+                                        MainActivity.this,
+                                        "QR scanned! Enter Room Code & tap Import.",
+                                        Toast.LENGTH_SHORT)
+                                    .show();
+                              }
+                            });
+                      }
+                    } finally {
+                      img.close();
+                    }
+                  },
+                  bgHandler);
+
+              camMgr.openCamera(
+                  selectedCamId,
+                  new android.hardware.camera2.CameraDevice.StateCallback() {
+                    @Override
+                    public void onOpened(android.hardware.camera2.CameraDevice camera) {
+                      camHolder[0] = camera;
+                      try {
+                        android.hardware.camera2.CaptureRequest.Builder req =
+                            camera.createCaptureRequest(
+                                android.hardware.camera2.CameraDevice.TEMPLATE_PREVIEW);
+                        reqHolder[0] = req;
+                        req.addTarget(previewSurface);
+                        req.addTarget(reader.getSurface());
+                        req.set(
+                            android.hardware.camera2.CaptureRequest.CONTROL_AF_MODE,
+                            android.hardware.camera2.CaptureRequest
+                                .CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+                        camera.createCaptureSession(
+                            Arrays.asList(previewSurface, reader.getSurface()),
+                            new android.hardware.camera2.CameraCaptureSession.StateCallback() {
+                              @Override
+                              public void onConfigured(
+                                  android.hardware.camera2.CameraCaptureSession session) {
+                                sessionHolder[0] = session;
+                                try {
+                                  session.setRepeatingRequest(req.build(), null, bgHandler);
+                                } catch (Exception ignored) {
+                                }
+                              }
+
+                              @Override
+                              public void onConfigureFailed(
+                                  android.hardware.camera2.CameraCaptureSession session) {}
+                            },
+                            bgHandler);
+                      } catch (Exception ignored) {
+                      }
+                    }
+
+                    @Override
+                    public void onDisconnected(android.hardware.camera2.CameraDevice camera) {
+                      camera.close();
+                    }
+
+                    @Override
+                    public void onError(android.hardware.camera2.CameraDevice camera, int error) {
+                      camera.close();
+                    }
+                  },
+                  bgHandler);
+            } catch (Exception e) {
+              runOnUiThread(
+                  () -> {
+                    scanDialog.dismiss();
+                    Toast.makeText(
+                            MainActivity.this,
+                            "Camera error: " + e.getMessage(),
+                            Toast.LENGTH_SHORT)
+                        .show();
+                  });
+            }
+          }
+
+          @Override
+          public void onSurfaceTextureSizeChanged(SurfaceTexture st, int w, int h) {}
+
+          @Override
+          public boolean onSurfaceTextureDestroyed(SurfaceTexture st) {
+            return true;
+          }
+
+          @Override
+          public void onSurfaceTextureUpdated(SurfaceTexture st) {}
+        });
+    scanDialog.show();
+  }
+
   private void showImportRoomModal() {
     LinearLayout body = vertical();
-    body.addView(text("Enter 12-char Room Code (e.g. FORGE-8A2F9C):", 12, AMBER, true));
     final EditText codeInput = new EditText(this);
     codeInput.setHint("FORGE-XXXXXX");
     codeInput.setTextColor(INK);
     codeInput.setHintTextColor(MUTED);
-    body.addView(codeInput);
-
-    TextView epText = text("Paste Friend's Encrypted Room Envelope:", 12, MUTED, false);
-    LinearLayout.LayoutParams ep = new LinearLayout.LayoutParams(-1, -2);
-    ep.topMargin = dp(6);
-    body.addView(epText, ep);
 
     final EditText envInput = new EditText(this);
-    envInput.setHint("-----BEGIN FAREFORGE MULTIPLAYER ROOM-----\n...");
+    envInput.setHint("Paste Convoy Pass or Scan QR above...");
     envInput.setTextColor(INK);
     envInput.setHintTextColor(MUTED);
-    envInput.setLines(5);
+    envInput.setLines(3);
+
+    Runnable performImport =
+        () -> {
+          String rawEnv = envInput.getText().toString().trim();
+          String[] unpacked = QrCodeHelper.unpackRoomPayload(rawEnv);
+          String code = unpacked != null ? unpacked[0] : codeInput.getText().toString().trim();
+          String env = unpacked != null ? unpacked[1] : rawEnv;
+          if (code.isEmpty() || env.isEmpty()) {
+            Toast.makeText(this, "Scan a QR code or enter Room Code and Pass", Toast.LENGTH_SHORT)
+                .show();
+            return;
+          }
+          try {
+            PeerMultiplayerSync.PeerRivalProfile rival =
+                PeerMultiplayerSync.parsePeerRival(env, code);
+            boolean ok = PeerMultiplayerSync.injectRivalIntoGame(game, rival);
+            if (ok) {
+              actionDone();
+              dismissCurrent();
+              Toast.makeText(
+                      this,
+                      "Imported rival: " + rival.companyName + " by " + rival.founderName + "!",
+                      Toast.LENGTH_LONG)
+                  .show();
+              selectTab(5); // Switch to Market tab
+            }
+          } catch (Exception e) {
+            Toast.makeText(this, "Invalid Convoy QR or Code: " + e.getMessage(), Toast.LENGTH_LONG)
+                .show();
+          }
+        };
+
+    Button scanBtn =
+        button(
+            "📷 Scan QR Code with Camera",
+            () -> openQrScannerDialog(codeInput, envInput, performImport));
+    primary(scanBtn);
+    body.addView(scanBtn);
+
+    TextView orLabel = text("Or paste Convoy Room Code & Pass manually:", 11, MUTED, false);
+    LinearLayout.LayoutParams olp = new LinearLayout.LayoutParams(-1, -2);
+    olp.topMargin = dp(8);
+    body.addView(orLabel, olp);
+    body.addView(codeInput);
     body.addView(envInput);
 
-    Button importAction =
-        button(
-            "⚔ Import Peer Company into Stock Market",
-            () -> {
-              String code = codeInput.getText().toString().trim();
-              String env = envInput.getText().toString().trim();
-              if (code.isEmpty() || env.isEmpty()) {
-                Toast.makeText(this, "Please enter both Room Code and Envelope", Toast.LENGTH_SHORT).show();
-                return;
-              }
-              try {
-                PeerMultiplayerSync.PeerRivalProfile rival =
-                    PeerMultiplayerSync.parsePeerRival(env, code);
-                boolean ok = PeerMultiplayerSync.injectRivalIntoGame(game, rival);
-                if (ok) {
-                  actionDone();
-                  dismissCurrent();
-                  Toast.makeText(
-                          this,
-                          "Imported rival: " + rival.companyName + " by " + rival.founderName + "!",
-                          Toast.LENGTH_LONG)
-                      .show();
-                  selectTab(4); // Switch to Market tab
-                }
-              } catch (Exception e) {
-                Toast.makeText(this, "Invalid Room Envelope or Code: " + e.getMessage(), Toast.LENGTH_LONG).show();
-              }
-            });
-    primary(importAction);
+    Button importAction = button("⚔ Join Convoy & Import Rival", performImport);
     body.addView(importAction);
 
     showThemedModal(
-        "IMPORT MULTIPLAYER RIVAL",
-        "PeerSplit Matchmaking",
-        "Decrypts your friend's company and places them on your Stock Exchange for competitive trading and buyout mergers.",
+        "JOIN CONVOY MULTIPLAYER",
+        "QR Code & Pass Matchmaking",
+        "Scan your friend's QR code to decrypt their company and place them on your Stock Exchange.",
         body,
         "Cancel",
         null);
@@ -2295,7 +2572,7 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
               MINT,
               true));
       item.addView(text(h.title, 17, AMBER, true));
-      item.addView(text(h.objective, 13, INK, false));
+      item.addView(text(Game.formatHistoricalObjective(h), 13, INK, false));
       Button playNow =
           button(
               "⚡ Play Scenario #" + (i + 1) + " →",
@@ -2356,10 +2633,10 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
             true));
     final int[] equityOptions = {100, 80, 60, 40};
     final String[] equityLabels = {
-      "100% Ownership · Bootstrapped (+0 cr Outside Seed, Full Control)",
-      "80% Ownership · Angel Co-Invested (+3,200 cr Seed Capital)",
-      "60% Ownership · Venture Syndicate (+6,400 cr Seed Capital)",
-      "40% Ownership · Public Float (+9,600 cr Seed Capital)"
+      "100% Ownership · Bootstrapped (+" + Game.money(0L) + " Outside Seed, Full Control)",
+      "80% Ownership · Angel Co-Invested (+" + Game.money(3200L) + " Seed Capital)",
+      "60% Ownership · Venture Syndicate (+" + Game.money(6400L) + " Seed Capital)",
+      "40% Ownership · Public Float (+" + Game.money(9600L) + " Seed Capital)"
     };
     final int[] selectedEquity = {80};
     RadioGroup equityGroup = new RadioGroup(this);
@@ -2530,7 +2807,7 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
     hiredCeoRb.setText(
         "Appoint Hired CEO "
             + hiredName
-            + " (240 cr/qtr) · Keep "
+            + " (" + Game.money(240L) + "/qtr) · Keep "
             + game.founderName
             + " as CEO of "
             + game.activeFounderCeoCompanyName());

@@ -9,7 +9,7 @@ import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 /**
- * PeerSplit / Nostr-style serverless E2EE cryptographic envelope for Fareforge.
+ * Fareforge Convoy serverless E2EE cryptographic envelope.
  *
  * Utilizes 256-bit AES-GCM authenticated encryption with 12-byte random IVs
  * and SHA-256 key derivation, allowing zero-server encrypted cloud backups

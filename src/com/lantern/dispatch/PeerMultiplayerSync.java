@@ -5,10 +5,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /**
- * PeerSplit-style serverless multiplayer sync manager and encrypted cloud backup broker.
+ * Fareforge Convoy serverless multiplayer sync manager and encrypted backup broker.
  *
  * Encapsulates:
- * 1. Encrypted Save Export & Import (Zero-Server Backup & Restore using PeerSplit E2EE).
+ * 1. Encrypted Save Export & Import (Zero-Server Backup & Restore using Convoy E2EE).
  * 2. Room Code Multiplayer Exchange: Generates/Consumes E2EE Peer Company Envelopes
  *    (import rival players as live competitors in your world).
  * 3. Nostr Relay event formatting (NIP-04/NIP-44 encrypted events for WebSocket sync).
@@ -157,7 +157,7 @@ public final class PeerMultiplayerSync {
     return "[\"EVENT\",{"
         + "\"kind\":20000,"
         + "\"created_at\":" + nowSec + ","
-        + "\"tags\":[[\"t\",\"" + topicTag + "\"],[\"app\",\"fareforge-peersplit\"]],"
+        + "\"tags\":[[\"t\",\"" + topicTag + "\"],[\"app\",\"fareforge-convoy\"]],"
         + "\"content\":\"" + encryptedPayloadHex + "\","
         + "\"pubkey\":\"0000000000000000000000000000000000000000000000000000000000000000\","
         + "\"id\":\"0000000000000000000000000000000000000000000000000000000000000000\","

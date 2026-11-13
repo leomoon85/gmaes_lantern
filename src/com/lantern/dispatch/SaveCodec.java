@@ -73,6 +73,7 @@ public final class SaveCodec {
       game.normalizeCareerState();
       validate(game);
       game.assignAvailableDrivers();
+      game.syncActiveCurrency();
       return game;
     } catch (ClassNotFoundException | RuntimeException e) {
       throw new IOException("Invalid save data", e);
@@ -105,9 +106,9 @@ public final class SaveCodec {
             && g.rating <= 5,
         "Invalid clock or rating");
     require(
-        g.campaignStartYear >= 2000
+        g.campaignStartYear >= 1950
             && g.campaignEndYear >= g.campaignStartYear
-            && g.campaignEndYear <= 2030,
+            && g.campaignEndYear <= 2150,
         "Invalid campaign years");
     require(
         g.districts != null

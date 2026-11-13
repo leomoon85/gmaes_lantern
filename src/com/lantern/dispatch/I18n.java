@@ -35,6 +35,7 @@ public final class I18n {
     en.put("tab_fleet", "Fleet");
     en.put("tab_hubs", "Hubs");
     en.put("tab_team", "Team");
+    en.put("tab_ledger", "Ledger");
     en.put("tab_market", "Market");
     en.put("tab_news", "News");
     en.put("menu", "Menu");
@@ -87,6 +88,7 @@ public final class I18n {
     es.put("tab_fleet", "Flota");
     es.put("tab_hubs", "Estaciones");
     es.put("tab_team", "Equipo");
+    es.put("tab_ledger", "Libro");
     es.put("tab_market", "Mercado");
     es.put("tab_news", "Noticias");
     es.put("menu", "Menú");
@@ -139,6 +141,7 @@ public final class I18n {
     fr.put("tab_fleet", "Flotte");
     fr.put("tab_hubs", "Gares");
     fr.put("tab_team", "Équipe");
+    fr.put("tab_ledger", "Bilan");
     fr.put("tab_market", "Bourse");
     fr.put("tab_news", "Journal");
     fr.put("menu", "Menu");
@@ -191,6 +194,7 @@ public final class I18n {
     de.put("tab_fleet", "Flotte");
     de.put("tab_hubs", "Bahnhöfe");
     de.put("tab_team", "Team");
+    de.put("tab_ledger", "Bilanz");
     de.put("tab_market", "Markt");
     de.put("tab_news", "Zeitung");
     de.put("menu", "Menü");
@@ -243,6 +247,7 @@ public final class I18n {
     ja.put("tab_fleet", "車両");
     ja.put("tab_hubs", "駅・拠点");
     ja.put("tab_team", "チーム");
+    ja.put("tab_ledger", "元帳");
     ja.put("tab_market", "株式市場");
     ja.put("tab_news", "新聞");
     ja.put("menu", "メニュー");
@@ -295,6 +300,7 @@ public final class I18n {
     zh.put("tab_fleet", "车队");
     zh.put("tab_hubs", "站点");
     zh.put("tab_team", "团队");
+    zh.put("tab_ledger", "账本");
     zh.put("tab_market", "股市");
     zh.put("tab_news", "新闻");
     zh.put("menu", "菜单");
@@ -347,6 +353,7 @@ public final class I18n {
     pt.put("tab_fleet", "Frota");
     pt.put("tab_hubs", "Estações");
     pt.put("tab_team", "Equipe");
+    pt.put("tab_ledger", "Razão");
     pt.put("tab_market", "Mercado");
     pt.put("tab_news", "Notícias");
     pt.put("menu", "Menu");
@@ -399,6 +406,7 @@ public final class I18n {
     ar.put("tab_fleet", "الأسطول");
     ar.put("tab_hubs", "المحطات");
     ar.put("tab_team", "الفريق");
+    ar.put("tab_ledger", "الدفتر");
     ar.put("tab_market", "السوق");
     ar.put("tab_news", "الأخبار");
     ar.put("menu", "القائمة");

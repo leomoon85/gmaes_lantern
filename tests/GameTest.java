@@ -447,14 +447,44 @@ public class GameTest {
     check(PeerMultiplayerSync.injectRivalIntoGame(matchGame, peer), "Inject peer rival into market");
     check(matchGame.companies.get(0).name.contains(peer.companyName), "Rival slot populated by peer player");
 
-    // 5. City Currency Standardization & Ambition Formatting
+    // 5. City Currency Standardization & Ambition Formatting (Year-Scaled)
     Game londonGame = new Game(1);
     check(Game.money(1000).startsWith("£"), "London active currency symbol is £");
-    check(londonGame.formatCityMoney(2500).startsWith("£"), "London formatCityMoney is £2,500");
-    check(Game.quickGoalNameForCity(Game.GOAL_WORTH_5CR, 1).contains("£312,500"), "London ambition in £");
+    check(londonGame.formatCityMoney(2500).startsWith("£"), "London formatCityMoney starts with £");
+    check(Game.quickGoalNameForCity(Game.GOAL_WORTH_5CR, 1).contains("£"), "London ambition in £");
     Game tokyoGame = new Game(3);
     check(Game.money(1000).startsWith("¥"), "Tokyo active currency symbol is ¥");
-    check(Game.quickGoalNameForCity(Game.GOAL_WORTH_5CR, 3).contains("¥312,500"), "Tokyo ambition in ¥");
+    check(Game.quickGoalNameForCity(Game.GOAL_WORTH_5CR, 3).contains("¥"), "Tokyo ambition in ¥");
+    check(
+        Game.scaleMoney(2000L, "INR", 2024) == 800000L
+            && Game.scaleMoney(2000L, "INR", 1965) == 30000L,
+        "INR fleet price scales by year standard (₹8,00,000 in 2024 vs ₹30,000 in 1965)");
+    Game branchSwitch = new Game(0);
+    branchSwitch.cash = 100000L;
+    branchSwitch.districts.get(2).open = true;
+    branchSwitch.rides = 25;
+    check(branchSwitch.expand(1), "Unlock London branch");
+    check(branchSwitch.switchCity(1), "Switch active city to London");
+    check("£".equals(Game.activeCurrencySymbol), "Switching city updates activeCurrencySymbol to £");
+    Game.CityBranchState prevCityState = null;
+    for (Game.CityBranchState bs : branchSwitch.cityStates) {
+      if (bs.cityId == 0) prevCityState = bs;
+    }
+    check(
+        prevCityState != null
+            && prevCityState.aiManaged
+            && prevCityState.aiManagerName.contains("AI Manager"),
+        "Previous city gets an AI Manager when switching cities");
+
+    Game calendarGame = new Game(0);
+    calendarGame.campaignStartYear = 2025;
+    calendarGame.campaignEndYear = 2025;
+    calendarGame.elapsed = 0;
+    check(calendarGame.year() == 2025 && "Jan".equals(calendarGame.monthName()), "Starts at Jan 2025");
+    calendarGame.elapsed = 5.5;
+    check("Feb".equals(calendarGame.monthName()), "Month advances from Jan to Feb");
+    calendarGame.elapsed = 65.0;
+    check(calendarGame.year() == 2026 && "Feb".equals(calendarGame.monthName()), "Year advances past 2025 to 2026");
 
     // 6. Multi-AI Rival Scenarios & Multiple Rival Fleet Cars
     Game multiAi = new Game();

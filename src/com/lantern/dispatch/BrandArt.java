@@ -399,6 +399,14 @@ final class BrandArt extends View {
           c.drawArc(14, 13, 24, 23, 210, 135, false, p);
           break;
         case 4:
+          // Ledger book / balance sheet icon
+          c.drawRoundRect(4, 3, 20, 21, 2, 2, p);
+          c.drawLine(8, 3, 8, 21, p);
+          c.drawLine(11, 8, 17, 8, p);
+          c.drawLine(11, 12, 17, 12, p);
+          c.drawLine(11, 16, 15, 16, p);
+          break;
+        case 5:
           c.drawLine(4, 3, 4, 21, p);
           c.drawLine(4, 21, 22, 21, p);
           Path path = new Path();

@@ -371,8 +371,16 @@ public class NativeGameTest {
     assertEquals(activity.game.founderXp, careerRestored.founderXp);
     assertTrue(careerRestored.medals[0] && careerRestored.medals[1]);
 
-    // 4. PeerSplit E2EE Multiplayer Room and Cloud Backup UI
-    dialogButton("🌐 Multiplayer & Cloud Backup (PeerSplit E2EE)");
+    // 4. Fareforge Convoy E2EE Multiplayer Room & QR Backup UI
+    dialogButton("🌐 Convoy Multiplayer & QR Backup (E2EE)");
+    String packed = QrCodeHelper.packRoomPayload("FORGE-ABC123", "ENVELOPE_DATA");
+    String[] unpacked = QrCodeHelper.unpackRoomPayload(packed);
+    assertNotNull(unpacked);
+    assertEquals("FORGE-ABC123", unpacked[0]);
+    assertEquals("ENVELOPE_DATA", unpacked[1]);
+    Bitmap qr = QrCodeHelper.encodeQr(packed, 128);
+    assertNotNull(qr);
+    qr.recycle();
   }
 
   private boolean containsBrowser(View view) {

@@ -1,8 +1,9 @@
 package com.lantern.dispatch;
 
-/** Geographic anchors for game hubs & street/bridge corridors. */
+/** Geographic anchors for game hubs & street/bridge corridors across all 6 world cities. */
 final class CityGeography {
   static final double[][][] HUBS = {
+    // 0: Bengaluru
     {
       {12.9601, 77.5747},
       {12.9784, 77.6408},
@@ -11,6 +12,7 @@ final class CityGeography {
       {12.9698, 77.7500},
       {12.9352, 77.6245}
     },
+    // 1: London
     {
       {51.4995, -.1248},
       {51.5054, -.0235},
@@ -19,6 +21,7 @@ final class CityGeography {
       {51.5055, -.0909},
       {51.4826, -.0077}
     },
+    // 2: New York
     {
       {40.7580, -73.9855},
       {40.7075, -74.0113},
@@ -27,6 +30,7 @@ final class CityGeography {
       {40.6782, -73.9442},
       {40.8448, -73.8648}
     },
+    // 3: Tokyo
     {
       {35.6938, 139.7034},
       {35.6984, 139.7730},
@@ -35,6 +39,7 @@ final class CityGeography {
       {35.6580, 139.7016},
       {35.6267, 139.7753}
     },
+    // 4: San Francisco
     {
       {37.7749, -122.4194},
       {37.7786, -122.4055},
@@ -43,6 +48,7 @@ final class CityGeography {
       {37.8080, -122.4177},
       {37.7290, -122.3920}
     },
+    // 5: Singapore
     {
       {1.2838, 103.8591},
       {1.2997, 103.7879},
@@ -54,67 +60,70 @@ final class CityGeography {
   };
 
   /**
-   * Street-and-bridge polylines for London corridors so vehicles follow dry-land arterial roads and
-   * real Thames bridges instead of cutting across the river. Each entry maps {gridCoord, lat, lon}.
+   * Dry-land street, tunnel, and bridge polylines per city:
+   * [city][0..6] = {topWest(5..15), topEast(15..25), botWest(5..15), botEast(15..25), colLeft(4..16), colMid(4..16), colRight(4..16)}.
    */
-  // y=4: Westminster(5) -> Canary Wharf(15) via Victoria Embankment & Commercial Rd (North Bank)
-  private static final double[][] LON_TOP_WEST_TO_MID = {
-    {5, 51.4995, -.1248},
-    {7, 51.5065, -.1210},
-    {9, 51.5112, -.1145},
-    {11, 51.5134, -.0890},
-    {13, 51.5122, -.0560},
-    {15, 51.5054, -.0235}
-  };
-  // y=4: Canary Wharf(15) -> Heathrow(25) via Aldgate, Holborn, Notting Hill & A4 M4 (North Bank)
-  private static final double[][] LON_TOP_MID_TO_EAST = {
-    {15, 51.5054, -.0235},
-    {17, 51.5146, -.0755},
-    {19, 51.5174, -.1200},
-    {21, 51.5074, -.1970},
-    {23, 51.4910, -.2900},
-    {25, 51.4700, -.4543}
-  };
-  // y=16: King's Cross(5) -> Southwark(15) via Blackfriars Bridge (perpendicular Thames crossing)
-  private static final double[][] LON_BOT_WEST_TO_MID = {
-    {5, 51.5308, -.1238},
-    {8, 51.5220, -.1120},
-    {10, 51.5122, -.1045},
-    {11, 51.5070, -.1045},
-    {13, 51.5058, -.0980},
-    {15, 51.5055, -.0909}
-  };
-  // y=16: Southwark(15) -> Greenwich(25) via Tooley St, Jamaica Rd & Creek Rd (South Bank)
-  private static final double[][] LON_BOT_MID_TO_EAST = {
-    {15, 51.5055, -.0909},
-    {17, 51.4995, -.0720},
-    {20, 51.4970, -.0490},
-    {23, 51.4838, -.0250},
-    {25, 51.4826, -.0077}
-  };
-  // x=5: Westminster(4) -> King's Cross(16) via Charing Cross & Euston Rd (North Bank)
-  private static final double[][] LON_COL_LEFT = {
-    {4, 51.4995, -.1248},
-    {8, 51.5105, -.1280},
-    {12, 51.5230, -.1295},
-    {16, 51.5308, -.1238}
-  };
-  // x=15: Canary Wharf(4) -> Southwark(16) via The Highway & Tower Bridge
-  private static final double[][] LON_COL_MID = {
-    {4, 51.5054, -.0235},
-    {8, 51.5095, -.0550},
-    {10, 51.5088, -.0754},
-    {12, 51.5022, -.0754},
-    {16, 51.5055, -.0909}
-  };
-  // x=25: Heathrow(4) -> Greenwich(16) via Kew Bridge & South Circular (South Bank)
-  private static final double[][] LON_COL_RIGHT = {
-    {4, 51.4700, -.4543},
-    {7, 51.4885, -.2875},
-    {8, 51.4820, -.2865},
-    {12, 51.4640, -.1650},
-    {14, 51.4755, -.0450},
-    {16, 51.4826, -.0077}
+  private static final double[][][][] CORRIDORS = {
+    // 0: Bengaluru (MG Rd, Bellary Rd, Outer Ring Rd avoiding Ulsoor & Bellandur lakes)
+    {
+      {{5, 12.9601, 77.5747}, {9, 12.9745, 77.6060}, {12, 12.9755, 77.6250}, {15, 12.9784, 77.6408}},
+      {{15, 12.9784, 77.6408}, {18, 13.0250, 77.6380}, {21, 13.1050, 77.6200}, {25, 13.1986, 77.7066}},
+      {{5, 12.9767, 77.5713}, {10, 12.9680, 77.6350}, {13, 12.9560, 77.7010}, {15, 12.9698, 77.7500}},
+      {{15, 12.9698, 77.7500}, {20, 12.9310, 77.6860}, {25, 12.9352, 77.6245}},
+      {{4, 12.9601, 77.5747}, {10, 12.9685, 77.5725}, {16, 12.9767, 77.5713}},
+      {{4, 12.9784, 77.6408}, {10, 12.9590, 77.6850}, {16, 12.9698, 77.7500}},
+      {{4, 13.1986, 77.7066}, {10, 13.0450, 77.6650}, {16, 12.9352, 77.6245}}
+    },
+    // 1: London (Thames bridges: Westminster, Blackfriars, Tower Bridge, Kew Bridge)
+    {
+      {{5, 51.4995, -.1248}, {7, 51.5065, -.1210}, {9, 51.5112, -.1145}, {11, 51.5134, -.0890}, {13, 51.5122, -.0560}, {15, 51.5054, -.0235}},
+      {{15, 51.5054, -.0235}, {17, 51.5146, -.0755}, {19, 51.5174, -.1200}, {21, 51.5074, -.1970}, {23, 51.4910, -.2900}, {25, 51.4700, -.4543}},
+      {{5, 51.5308, -.1238}, {8, 51.5220, -.1120}, {10, 51.5122, -.1045}, {11, 51.5070, -.1045}, {13, 51.5058, -.0980}, {15, 51.5055, -.0909}},
+      {{15, 51.5055, -.0909}, {17, 51.4995, -.0720}, {20, 51.4970, -.0490}, {23, 51.4838, -.0250}, {25, 51.4826, -.0077}},
+      {{4, 51.4995, -.1248}, {8, 51.5105, -.1280}, {12, 51.5230, -.1295}, {16, 51.5308, -.1238}},
+      {{4, 51.5054, -.0235}, {8, 51.5095, -.0550}, {10, 51.5088, -.0754}, {12, 51.5022, -.0754}, {16, 51.5055, -.0909}},
+      {{4, 51.4700, -.4543}, {7, 51.4885, -.2875}, {8, 51.4820, -.2865}, {12, 51.4640, -.1650}, {14, 51.4755, -.0450}, {16, 51.4826, -.0077}}
+    },
+    // 2: New York (Lincoln/Holland Tunnels, Manhattan Bridge, Van Wyck, RFK/Triborough Bridge)
+    {
+      {{5, 40.7580, -73.9855}, {9, 40.7420, -73.9980}, {12, 40.7220, -74.0060}, {15, 40.7075, -74.0113}},
+      {{15, 40.7075, -74.0113}, {17, 40.7061, -73.9969}, {19, 40.6960, -73.9830}, {21, 40.6780, -73.9100}, {23, 40.6650, -73.8450}, {25, 40.6413, -73.7781}},
+      {{5, 40.7282, -74.0776}, {8, 40.7295, -74.0420}, {10, 40.7275, -74.0150}, {12, 40.7190, -74.0010}, {13, 40.6990, -73.9860}, {15, 40.6782, -73.9442}},
+      {{15, 40.6782, -73.9442}, {18, 40.7280, -73.9280}, {21, 40.7720, -73.9180}, {23, 40.8050, -73.9120}, {25, 40.8448, -73.8648}},
+      {{4, 40.7580, -73.9855}, {8, 40.7625, -74.0020}, {10, 40.7685, -74.0220}, {13, 40.7480, -74.0450}, {16, 40.7282, -74.0776}},
+      {{4, 40.7075, -74.0113}, {8, 40.7065, -73.9950}, {11, 40.6950, -73.9820}, {16, 40.6782, -73.9442}},
+      {{4, 40.6413, -73.7781}, {8, 40.7050, -73.8150}, {12, 40.7820, -73.8320}, {14, 40.8060, -73.8450}, {16, 40.8448, -73.8648}}
+    },
+    // 3: Tokyo (Yasukuni-dori, Shuto #1 inland land route to Haneda, Rainbow Bridge to Odaiba)
+    {
+      {{5, 35.6938, 139.7034}, {10, 35.6940, 139.7350}, {15, 35.6984, 139.7730}},
+      {{15, 35.6984, 139.7730}, {17, 35.6750, 139.7660}, {19, 35.6285, 139.7388}, {21, 35.5880, 139.7320}, {23, 35.5620, 139.7440}, {25, 35.5494, 139.7798}},
+      {{5, 35.6285, 139.7388}, {10, 35.6490, 139.7180}, {15, 35.6580, 139.7016}},
+      {{15, 35.6580, 139.7016}, {18, 35.6520, 139.7340}, {21, 35.6435, 139.7540}, {23, 35.6366, 139.7632}, {25, 35.6267, 139.7753}},
+      {{4, 35.6938, 139.7034}, {10, 35.6580, 139.7016}, {16, 35.6285, 139.7388}},
+      {{4, 35.6984, 139.7730}, {10, 35.6720, 139.7350}, {16, 35.6580, 139.7016}},
+      {{4, 35.5494, 139.7798}, {7, 35.5650, 139.7480}, {10, 35.6050, 139.7420}, {13, 35.6366, 139.7632}, {16, 35.6267, 139.7753}}
+    },
+    // 4: San Francisco (US-101 inland corridor & 3rd St, avoiding SF Bay water)
+    {
+      {{5, 37.7749, -122.4194}, {15, 37.7786, -122.4055}},
+      {{15, 37.7786, -122.4055}, {18, 37.7420, -122.4050}, {21, 37.6850, -122.4060}, {25, 37.6213, -122.3790}},
+      {{5, 37.7599, -122.4148}, {10, 37.7850, -122.4200}, {15, 37.8080, -122.4177}},
+      {{15, 37.8080, -122.4177}, {19, 37.7820, -122.4030}, {22, 37.7560, -122.3930}, {25, 37.7290, -122.3920}},
+      {{4, 37.7749, -122.4194}, {16, 37.7599, -122.4148}},
+      {{4, 37.7786, -122.4055}, {10, 37.7920, -122.4140}, {16, 37.8080, -122.4177}},
+      {{4, 37.6213, -122.3790}, {10, 37.6750, -122.4040}, {16, 37.7290, -122.3920}}
+    },
+    // 5: Singapore (AYE, ECP dry-land coastal expressway, Sentosa Gateway Bridge)
+    {
+      {{5, 1.2838, 103.8591}, {10, 1.2890, 103.8250}, {15, 1.2997, 103.7879}},
+      {{15, 1.2997, 103.7879}, {18, 1.3048, 103.8318}, {21, 1.3180, 103.9050}, {25, 1.3644, 103.9915}},
+      {{5, 1.2640, 103.6179}, {10, 1.3120, 103.7300}, {15, 1.3048, 103.8318}},
+      {{15, 1.3048, 103.8318}, {19, 1.2780, 103.8260}, {22, 1.2648, 103.8222}, {25, 1.2494, 103.8303}},
+      {{4, 1.2838, 103.8591}, {9, 1.2950, 103.7850}, {13, 1.3150, 103.7000}, {16, 1.2640, 103.6179}},
+      {{4, 1.2997, 103.7879}, {16, 1.3048, 103.8318}},
+      {{4, 1.3644, 103.9915}, {8, 1.3180, 103.9300}, {11, 1.2920, 103.8720}, {13, 1.2720, 103.8380}, {14, 1.2648, 103.8222}, {16, 1.2494, 103.8303}}
+    }
   };
 
   static double[] hub(int city, int index) {
@@ -137,46 +146,32 @@ final class CityGeography {
     return new double[] {last[1], last[2]};
   }
 
-  private static double[] londonCellLatLng(double x, double y) {
-    // Exact hub matches
+  private static double[] cellLatLng(int city, double x, double y) {
+    int c = Math.max(0, Math.min(CORRIDORS.length - 1, city));
+    double[][][] cityCorridors = CORRIDORS[c];
     if (Math.abs(y - 4) < 0.01) {
       return x <= 15
-          ? samplePolyline(LON_TOP_WEST_TO_MID, x)
-          : samplePolyline(LON_TOP_MID_TO_EAST, x);
+          ? samplePolyline(cityCorridors[0], x)
+          : samplePolyline(cityCorridors[1], x);
     }
     if (Math.abs(y - 16) < 0.01) {
       return x <= 15
-          ? samplePolyline(LON_BOT_WEST_TO_MID, x)
-          : samplePolyline(LON_BOT_MID_TO_EAST, x);
+          ? samplePolyline(cityCorridors[2], x)
+          : samplePolyline(cityCorridors[3], x);
     }
-    if (Math.abs(x - 5) < 0.01) return samplePolyline(LON_COL_LEFT, y);
-    if (Math.abs(x - 15) < 0.01) return samplePolyline(LON_COL_MID, y);
-    if (Math.abs(x - 25) < 0.01) return samplePolyline(LON_COL_RIGHT, y);
+    if (Math.abs(x - 5) < 0.01) return samplePolyline(cityCorridors[4], y);
+    if (Math.abs(x - 15) < 0.01) return samplePolyline(cityCorridors[5], y);
+    if (Math.abs(x - 25) < 0.01) return samplePolyline(cityCorridors[6], y);
 
-    // Interior grid streets blend smoothly between the top/bottom/column arterial corridors
     double v = Math.max(0, Math.min(1, (y - 4) / 12.0));
     double[] top =
-        x <= 15 ? samplePolyline(LON_TOP_WEST_TO_MID, x) : samplePolyline(LON_TOP_MID_TO_EAST, x);
+        x <= 15 ? samplePolyline(cityCorridors[0], x) : samplePolyline(cityCorridors[1], x);
     double[] bot =
-        x <= 15 ? samplePolyline(LON_BOT_WEST_TO_MID, x) : samplePolyline(LON_BOT_MID_TO_EAST, x);
+        x <= 15 ? samplePolyline(cityCorridors[2], x) : samplePolyline(cityCorridors[3], x);
     return new double[] {
       top[0] * (1 - v) + bot[0] * v,
       top[1] * (1 - v) + bot[1] * v
     };
-  }
-
-  private static double[] cellLatLng(int city, double x, double y) {
-    if (city == 1) return londonCellLatLng(x, y);
-    double u = Math.max(0, Math.min(2, (x - 5) / 10)), v = Math.max(0, Math.min(1, (y - 4) / 12));
-    int col = Math.min(1, (int) u);
-    double f = u - col;
-    double[] result = new double[2];
-    for (int k = 0; k < 2; k++) {
-      double top = HUBS[city][col][k] * (1 - f) + HUBS[city][col + 1][k] * f;
-      double bottom = HUBS[city][col + 3][k] * (1 - f) + HUBS[city][col + 4][k] * f;
-      result[k] = top * (1 - v) + bottom * v;
-    }
-    return result;
   }
 
   static double[] position(int city, int cell, int next, double progress) {

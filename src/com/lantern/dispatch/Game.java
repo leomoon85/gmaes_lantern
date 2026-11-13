@@ -825,9 +825,15 @@ public final class Game implements java.io.Serializable {
     public final ArrayList<Company> companies = new ArrayList<>();
     public final ArrayList<Ride> requests = new ArrayList<>();
     public final int[] corridorTier = new int[W * H];
+    public String aiManagerName = "";
+    public boolean aiManaged = false;
+    public long aiManagedEarnings = 0L;
+    public int aiManagedRides = 0;
+    public String aiLastAction = "Ready for dispatch";
 
     public CityBranchState(int cityId) {
       this.cityId = cityId;
+      this.aiManagerName = "AI Manager · " + HIRED_CEO_ROSTER[Math.abs(cityId) % HIRED_CEO_ROSTER.length];
     }
   }
 
@@ -1587,6 +1593,7 @@ public final class Game implements java.io.Serializable {
     this.quickGoalType = Math.max(0, Math.min(QUICK_GOAL_NAMES.length - 1, goalType));
     setDifficulty(diffIdx);
     loadScenario(cityIdx);
+    campaignEndYear = 2100;
     this.cash = Math.round(12000L * difficultyFareFactor());
     this.message =
         "Quick Play (" + currentScenario().city + "): " + QUICK_GOAL_NAMES[this.quickGoalType];
@@ -1616,7 +1623,8 @@ public final class Game implements java.io.Serializable {
         c.cash = 12500;
       }
     }
-    this.message = "Scenario #" + (h.id + 1) + " [" + h.era + "]: " + h.objective;
+    this.message =
+        "Scenario #" + (h.id + 1) + " [" + h.era + "]: " + formatHistoricalObjective(h);
   }
 
   private void syncHistoryStageToStartYear() {
@@ -1646,7 +1654,7 @@ public final class Game implements java.io.Serializable {
       this.tutorialStep++;
       if (this.tutorialStep == 8) {
         this.cash += 5000;
-        this.message = "Tutorial Graduated! +5,000 cr Academy Grant awarded.";
+        this.message = "Tutorial Graduated! +" + money(5000L) + " Academy Grant awarded.";
       } else {
         this.message = "Tutorial Step " + this.tutorialStep + "/8 unlocked.";
       }
@@ -1724,7 +1732,7 @@ public final class Game implements java.io.Serializable {
     createRide(0, 1);
     createRide(1, 0);
     Scenario sc = currentScenario();
-    activeCurrencySymbol = sc.currencySymbol;
+    syncActiveCurrency();
     lastAnnualMeetingYear = 0;
     annualRevenue = 0L;
     annualExpenses = 0L;
@@ -1736,7 +1744,8 @@ public final class Game implements java.io.Serializable {
     investorApprovalRating = 85;
     annualMeetingPending = false;
     corporateDividendRate = 400L;
-    message = sc.city + " Scenario (" + sc.title + "): " + sc.goalText + ".";
+    message =
+        sc.city + " Scenario (" + sc.title + "): " + formatScenarioGoal(sc, year()) + ".";
   }
 
   private void populateCityTemplate(int cityId, List<District> distOut, List<Company> compOut) {
@@ -2007,12 +2016,24 @@ public final class Game implements java.io.Serializable {
       return false;
     }
     if (targetCity == scenarioId) {
+      syncActiveCurrency();
       message = "Currently managing " + regions[targetCity] + " operations.";
       return true;
     }
+    int prevCity = scenarioId;
     saveCurrentCityState();
+    CityBranchState prevState = ensureCityBranchState(prevCity);
+    if (prevState.aiManagerName == null || prevState.aiManagerName.isEmpty()) {
+      prevState.aiManagerName =
+          "AI Manager · " + HIRED_CEO_ROSTER[Math.abs(prevCity) % HIRED_CEO_ROSTER.length];
+    }
+    prevState.aiManaged = true;
+    prevState.aiLastAction = "Operating " + prevState.taxis.size() + " fleet while you lead " + regions[targetCity];
+
     CityBranchState next = ensureCityBranchState(targetCity);
+    next.aiManaged = false;
     this.scenarioId = targetCity;
+    syncActiveCurrency();
     districts.clear();
     districts.addAll(next.districts);
     taxis.clear();
@@ -2030,7 +2051,16 @@ public final class Game implements java.io.Serializable {
       createRide(1, 0);
     }
     pendingSoundCue = CUE_DISPATCH;
-    message = "Switched active city management to " + regions[targetCity] + ".";
+    message =
+        "Switched to "
+            + regions[targetCity]
+            + " ("
+            + activeCurrencySymbol
+            + "). "
+            + prevState.aiManagerName
+            + " is now managing "
+            + regions[prevCity]
+            + ".";
     return true;
   }
 
@@ -2234,8 +2264,24 @@ public final class Game implements java.io.Serializable {
     return rushHour() ? .65 : 1;
   }
 
+  private static final String[] MONTHS = {
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+  };
+
   public int year() {
-    return Math.min(campaignEndYear, campaignStartYear + (int) (elapsed / 60));
+    int y = campaignStartYear + (int) (elapsed / 60);
+    if (gameMode == MODE_SOLO_SCENARIO && campaignEndYear > campaignStartYear) {
+      return Math.min(campaignEndYear, y);
+    }
+    return y;
+  }
+
+  public int monthIndex() {
+    return Math.max(0, Math.min(11, (int) ((elapsed % 60) / 5)));
+  }
+
+  public String monthName() {
+    return MONTHS[monthIndex()];
   }
 
   public double demandFactor() {
@@ -2811,7 +2857,8 @@ public final class Game implements java.io.Serializable {
 
   public String formatCityMoney(long n) {
     Scenario sc = currentScenario();
-    return String.format(Locale.US, "%s%,d", sc.currencySymbol, n);
+    long scaled = scaleMoney(n, sc.currencyCode, year());
+    return String.format(Locale.US, "%s%,d", sc.currencySymbol, scaled);
   }
 
   public long bondDebt() {
@@ -2820,7 +2867,7 @@ public final class Game implements java.io.Serializable {
 
   public boolean issueBond() {
     if (bonds >= MAX_BONDS) {
-      message = "Bond limit reached (max 3 bonds / 15,000 cr).";
+      message = "Bond limit reached (max " + MAX_BONDS + " bonds / " + money(MAX_BONDS * BOND_FACE) + ").";
       return false;
     }
     if (bankHoliday()) {
@@ -2829,7 +2876,7 @@ public final class Game implements java.io.Serializable {
     }
     bonds++;
     cash += BOND_FACE;
-    message = "Issued " + money(BOND_FACE) + " corporate bond (175 cr quarterly interest).";
+    message = "Issued " + money(BOND_FACE) + " corporate bond (" + money(175L) + " quarterly interest).";
     return true;
   }
 
@@ -3093,14 +3140,36 @@ public final class Game implements java.io.Serializable {
 
   private void market() {
     marketTick++;
-    // 1. Background City Branch Earnings (scaled by actual fleet & hubs in each saved city)
+    // 1. Background City Branch Earnings (AI City Manager runs each unlocked inactive city)
     long regional = 0L;
     for (int cIdx = 0; cIdx < branches.length; cIdx++) {
       if (branches[cIdx] && cIdx != scenarioId) {
         CityBranchState bs = ensureCityBranchState(cIdx);
+        if (bs.aiManagerName == null || bs.aiManagerName.isEmpty()) {
+          bs.aiManagerName =
+              "AI Manager · " + HIRED_CEO_ROSTER[Math.abs(cIdx) % HIRED_CEO_ROSTER.length];
+        }
+        bs.aiManaged = true;
         int bOpen = 0;
         for (District d : bs.districts) if (d.open) bOpen++;
-        regional += Math.round((140L + bs.taxis.size() * 90L + bOpen * 45L) * demandFactor());
+        // AI Manager actively dispatches rides and keeps branch fleet maintained & clean
+        for (Taxi bt : bs.taxis) {
+          bt.condition = Math.max(70.0, Math.min(100.0, bt.condition + 5.0));
+          bt.cleanliness = Math.max(75.0, Math.min(100.0, bt.cleanliness + 5.0));
+          bt.broken = false;
+        }
+        int completed = Math.max(1, bs.taxis.size() + bOpen / 2);
+        long grossBranch =
+            Math.round((180L + bs.taxis.size() * 115L + bOpen * 55L) * demandFactor());
+        long aiManagerFee = 45L;
+        long netBranch = Math.max(50L, grossBranch - aiManagerFee);
+        bs.aiManagedRides += completed;
+        bs.aiManagedEarnings += netBranch;
+        bs.aiLastAction =
+            "Dispatched " + completed + " trips · Maintained " + bs.taxis.size() + " fleet";
+        rides += completed;
+        annualRides += completed;
+        regional += netBranch;
         for (int i = 0; i < bs.companies.size(); i++) {
           Company c = bs.companies.get(i);
           if (c.merged) continue;
@@ -3116,6 +3185,7 @@ public final class Game implements java.io.Serializable {
     }
     cash += regional;
     revenue += regional;
+    annualRevenue += regional;
     if (businessModel == 2) {
       long subscription = taxis.size() * 80L;
       cash += subscription;
@@ -3217,6 +3287,7 @@ public final class Game implements java.io.Serializable {
     competitionClock += dt;
     history();
     int curYear = year();
+    if (curYear != activeYear) syncActiveCurrency();
     if (lastAnnualMeetingYear == 0) {
       lastAnnualMeetingYear = curYear;
     } else if (curYear > lastAnnualMeetingYear && gameMode != MODE_TUTORIAL) {
@@ -3457,18 +3528,76 @@ public final class Game implements java.io.Serializable {
   }
 
   public static volatile String activeCurrencySymbol = "₹";
+  public static volatile String activeCurrencyCode = "INR";
+  public static volatile int activeYear = 2020;
+
+  public void syncActiveCurrency() {
+    Scenario sc = currentScenario();
+    activeCurrencySymbol = sc.currencySymbol;
+    activeCurrencyCode = sc.currencyCode;
+    activeYear = year();
+  }
+
+  public static long currencyYearScale(String currencyCode, int year) {
+    if ("INR".equals(currencyCode)) {
+      if (year <= 1970) return 15L;
+      if (year <= 1990) return 50L;
+      if (year <= 2005) return 150L;
+      if (year <= 2015) return 250L;
+      return 400L; // 2016+: 2,000 base fleet -> ₹8,00,000
+    }
+    if ("JPY".equals(currencyCode)) {
+      if (year <= 1970) return 200L;
+      if (year <= 1990) return 600L;
+      if (year <= 2005) return 1000L;
+      if (year <= 2015) return 1300L;
+      return 1600L; // 2016+: 2,000 base fleet -> ¥3,200,000
+    }
+    if ("SGD".equals(currencyCode)) {
+      if (year <= 1970) return 3L;
+      if (year <= 1990) return 10L;
+      if (year <= 2005) return 20L;
+      if (year <= 2015) return 30L;
+      return 40L; // 2016+: 2,000 base fleet -> S$80,000 (incl. COE)
+    }
+    if ("GBP".equals(currencyCode)) {
+      if (year <= 1970) return 1L;
+      if (year <= 1990) return 4L;
+      if (year <= 2005) return 8L;
+      if (year <= 2015) return 10L;
+      return 12L; // 2016+: 2,000 base fleet -> £24,000
+    }
+    // USD & fallback
+    if (year <= 1970) return 1L;
+    if (year <= 1990) return 5L;
+    if (year <= 2005) return 10L;
+    if (year <= 2015) return 12L;
+    return 15L; // 2016+: 2,000 base fleet -> $30,000
+  }
+
+  public static long scaleMoney(long n, String currencyCode, int year) {
+    return n * currencyYearScale(currencyCode, year);
+  }
 
   public static String money(long n) {
-    return activeCurrencySymbol + String.format(Locale.US, "%,d", n);
+    long scaled = scaleMoney(n, activeCurrencyCode, activeYear);
+    return activeCurrencySymbol + String.format(Locale.US, "%,d", scaled);
   }
 
   public static String quickGoalNameForCity(int goalType, int cityIdx) {
     Scenario sc = SCENARIOS[Math.max(0, Math.min(SCENARIOS.length - 1, cityIdx))];
+    int y = activeYear > 0 ? activeYear : 2020;
     switch (goalType) {
       case GOAL_WORTH_5CR:
-        return "Survive & Reach " + sc.currencySymbol + "312,500 Net Worth";
+        return "Survive & Reach "
+            + sc.currencySymbol
+            + String.format(Locale.US, "%,d", scaleMoney(312500L, sc.currencyCode, y))
+            + " Net Worth";
       case GOAL_DEBT_FREE_IPO:
-        return "Debt-Free IPO: 0 Debt & " + sc.currencySymbol + "60,000 Net Worth";
+        return "Debt-Free IPO: 0 Debt & "
+            + sc.currencySymbol
+            + String.format(Locale.US, "%,d", scaleMoney(60000L, sc.currencyCode, y))
+            + " Net Worth";
       default:
         return QUICK_GOAL_NAMES[Math.max(0, Math.min(QUICK_GOAL_NAMES.length - 1, goalType))];
     }
@@ -3508,11 +3637,37 @@ public final class Game implements java.io.Serializable {
     }
   }
 
+  public static String formatScenarioGoal(Scenario sc, int year) {
+    long scaledWorth = scaleMoney(sc.targetWorth, sc.currencyCode, year);
+    return "Open "
+        + sc.targetStations
+        + " stations, complete "
+        + sc.targetRides
+        + " hauls, reach "
+        + sc.currencySymbol
+        + String.format(Locale.US, "%,d", scaledWorth)
+        + " net worth";
+  }
+
+  public static String formatHistoricalObjective(HistoricalScenarioDef h) {
+    Scenario sc = SCENARIOS[Math.max(0, Math.min(SCENARIOS.length - 1, h.cityId))];
+    String clean = h.objective.replaceAll("\\s*\\([^)]*cr\\)", "");
+    if (h.targetWorth > 0) {
+      long scaledWorth = scaleMoney(h.targetWorth, sc.currencyCode, h.startYear);
+      String worthStr = sc.currencySymbol + String.format(Locale.US, "%,d", scaledWorth);
+      if (!clean.contains(worthStr)) {
+        clean = clean + " · Target Worth: " + worthStr;
+      }
+    }
+    return clean;
+  }
+
   public String objectiveText() {
     if (gameMode == MODE_SOLO_QUICK) return quickGoalNameForCity(quickGoalType, scenarioId);
-    if (gameMode == MODE_SOLO_SCENARIO) return currentHistoricalScenario().objective;
+    if (gameMode == MODE_SOLO_SCENARIO)
+      return formatHistoricalObjective(currentHistoricalScenario());
     if (gameMode == MODE_TUTORIAL) return "Academy · step " + tutorialStep + " / 8";
-    return currentScenario().goalText;
+    return formatScenarioGoal(currentScenario(), year());
   }
 
   public boolean objectiveComplete() {

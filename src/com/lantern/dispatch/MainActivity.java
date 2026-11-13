@@ -38,15 +38,23 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
         if (this.foreground && !this.closed) Choreographer.getInstance().postFrameCallback(this);
       };
   private LinearLayout root, nav, management, dispatch, goalBox, goalBody, cityTickerRow;
-  private TextView title, metrics, message, goalTitle, goalDetail, campaignGoalText;
-  private Button speedButton, goalAction, goalCollapseButton;
-  private String tickerKey = "";
-  private boolean goalCollapsed = false;
+  private TextView title, metrics, message, goalEyebrow, goalTitle, goalDetail, campaignGoalText;
+  private ImageView advisorAvatar;
+  private Button speedButton, goalAction, goalCollapseButton, fitButton;
+  private String tickerKey = "", lastNewsNoticeId = "";
+  private boolean goalCollapsed = true;
+  private boolean goalHasUnread = false;
+  private boolean dispatchCollapsed = false;
+  private TextView notificationBanner;
+  private final Runnable hideNotificationRunnable =
+      () -> {
+        if (notificationBanner != null) notificationBanner.setVisibility(View.GONE);
+      };
   WorldMapView map;
   private FrameLayout worldPane;
   private boolean wideLayout;
   private TextView mapCaption;
-  private Button autoButton, streetButton;
+  private Button autoButton, streetButton, goalsButton;
   private ProgressBar chapterProgress;
   private final HashMap<Integer, ProgressBar> requestMeters = new HashMap<>();
   private ScrollView managementScroll;
@@ -86,14 +94,14 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
       chapterTabs = {0, 1, 2, 3, 2, 0};
   private final String[] tasks = {
     "",
-    "Tap a waiting trip to dispatch your vehicle.",
-    "Complete one trip. Let your vehicle reach its destination.",
-    "Buy a second vehicle in Fleet.",
-    "Open a third station in Hubs.",
-    "Upgrade one hub to level two.",
-    "Hire a manager in Team.",
-    "Buy a rival’s shares in Market.",
-    "Academy complete. Your company is ready to grow."
+    "👋 Hi! I'm Maya, your Chief Dispatcher.\nFirst, tap 'Dispatch →' at the bottom to pick up your first rider!",
+    "Nice! Car #1 is driving along the road.\nTap '⚡ Complete Trip' below or watch it reach its destination.",
+    "Awesome! Next, let's expand your fleet.\nTap 'Open Fleet →' below and buy a 2nd vehicle.",
+    "More stations bring bigger fares!\nOpen 'Hubs' and unlock a 3rd station in your city.",
+    "Great! Now upgrade any open station in 'Hubs' to Level 2 for +15% fares.",
+    "Let's hire help! Open 'Team' and recruit a Manager to automate upkeep.",
+    "Final lesson: Open 'Market' and buy 10 shares in a rival company.",
+    "🎓 Test level complete! +5,000 cr bonus awarded.\nYou're ready to build your mobility empire!"
   };
 
   @Override
@@ -107,6 +115,9 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
     String savedLang = getPreferences(0).getString("lang", null);
     soundtrack = new BackgroundMusic(this, music);
     soundtrack.setSfxEnabled(sound);
+    soundtrack.setAutoRotate(getPreferences(0).getBoolean("radioAuto", true));
+    int savedTrack = getPreferences(0).getInt("trackIndex", 0);
+    if (savedTrack != 0) soundtrack.selectTrack(savedTrack);
     setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC);
     saves = new SaveStore(this);
     boolean restored = false;
@@ -123,6 +134,15 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
       saveError = "The previous save could not be restored. It has been kept on this device.";
     }
     if (savedLang != null) game.setLanguage(savedLang);
+    long comebackBonus = game.evaluateDailyAndOfflineComeback(System.currentTimeMillis());
+    if (restored && comebackBonus > 0) {
+      game.message =
+          "🔥 Welcome back! Day "
+              + game.dailyStreak
+              + " streak & +"
+              + Game.money(comebackBonus)
+              + " bonus ready in Lv/Medals!";
+    }
     for (Game.Report report : game.reports) {
       report.title = report.title.replace("Lantern", "Fareforge");
       report.body = report.body.replace("Lantern", "Fareforge");
@@ -250,6 +270,10 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
     if (frameTime - lastHud > 500_000_000) {
       updateHud(false);
       lastHud = frameTime;
+      if (game != null && game.annualMeetingPending && !modalOpen() && !home) {
+        game.annualMeetingPending = false;
+        showAnnualMeetingModal();
+      }
     }
     if (!home && frameTime - lastSave > 10_000_000_000L) {
       saveAsync();
@@ -301,12 +325,13 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
   Button button(String value, Runnable action) {
     Button v = new Button(this);
     v.setText(value);
-    v.setTextSize(12);
+    v.setTextSize(14);
     v.setTextColor(INK);
+    v.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
     v.setAllCaps(false);
     v.setMinHeight(dp(48));
     v.setMinimumWidth(0);
-    v.setPadding(dp(10), dp(6), dp(10), dp(6));
+    v.setPadding(dp(12), dp(8), dp(12), dp(8));
     v.setBackground(
         new android.graphics.drawable.RippleDrawable(
             android.content.res.ColorStateList.valueOf(0x30ffffff), shape(0xff1e314b, 12), null));
@@ -315,6 +340,22 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
     v.setLayoutParams(p);
     v.setOnClickListener(view -> action.run());
     return v;
+  }
+
+  LinearLayout buttonRow(Button first, Button second) {
+    LinearLayout row = new LinearLayout(this);
+    row.setOrientation(LinearLayout.HORIZONTAL);
+    LinearLayout.LayoutParams a = new LinearLayout.LayoutParams(0, -2, 1f);
+    a.setMargins(0, dp(6), dp(4), 0);
+    first.setLayoutParams(a);
+    row.addView(first);
+    if (second != null) {
+      LinearLayout.LayoutParams b = new LinearLayout.LayoutParams(0, -2, 1f);
+      b.setMargins(dp(4), dp(6), 0, 0);
+      second.setLayoutParams(b);
+      row.addView(second);
+    }
+    return row;
   }
 
   void primary(Button b) {
@@ -332,11 +373,11 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
     LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
     p.setMargins(dp(10), dp(7), dp(10), dp(4));
     parent.addView(c, p);
-    c.addView(text(heading, 17, INK, true));
+    c.addView(text(heading, 18, INK, true));
     if (description != null && !description.isEmpty()) {
-      TextView desc = text(description, 13, MUTED, false);
+      TextView desc = text(description, 14, MUTED, false);
       LinearLayout.LayoutParams d = new LinearLayout.LayoutParams(-1, -2);
-      d.topMargin = dp(8);
+      d.topMargin = dp(6);
       c.addView(desc, d);
     }
     return c;
@@ -365,19 +406,23 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
     float density = getResources().getDisplayMetrics().density;
     LinearLayout header = new LinearLayout(this);
     header.setGravity(Gravity.CENTER_VERTICAL);
-    header.setPadding(dp(12), dp(8), dp(12), dp(6));
+    header.setPadding(dp(10), dp(6), dp(10), dp(6));
     header.setBackground(medallionShape(0xff162740, 0xff0d1829, 0x55edbb73, 0));
     ImageView mark = new ImageView(this);
     mark.setImageDrawable(BrandArt.crestDrawable(0xff14253b, AMBER, density));
     mark.setContentDescription("Fareforge");
-    header.addView(mark, new LinearLayout.LayoutParams(dp(38), dp(38)));
+    header.addView(mark, new LinearLayout.LayoutParams(dp(34), dp(34)));
     LinearLayout heading = vertical();
-    heading.setPadding(dp(10), 0, 0, 0);
-    TextView brand = text("FAREFORGE  ·  TYCOON ALMANAC", 9, AMBER, true);
-    brand.setLetterSpacing(.16f);
-    title = text("CITY OPERATIONS", 17, INK, true);
-    heading.addView(brand);
+    heading.setPadding(dp(9), 0, dp(4), 0);
+    title = text("CITY OPERATIONS", 16, INK, true);
+    title.setSingleLine(true);
+    title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+    metrics = text("", 12, MINT, true);
+    metrics.setSingleLine(true);
+    metrics.setEllipsize(android.text.TextUtils.TruncateAt.END);
+    metrics.setPadding(0, dp(1), 0, 0);
     heading.addView(title);
+    heading.addView(metrics);
     heading.setOnClickListener(v -> showCityBranchSwitcherModal());
     header.addView(heading, new LinearLayout.LayoutParams(0, -2, 1));
     speedButton =
@@ -388,32 +433,25 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
               updateHud(true);
               saveAsync();
             });
-    speedButton.setBackground(medallionShape(0xff243b59, 0xff16263b, AMBER, 22));
+    speedButton.setBackground(medallionShape(0xff243b59, 0xff16263b, AMBER, 20));
     speedButton.setTextColor(AMBER);
-    header.addView(speedButton, new LinearLayout.LayoutParams(dp(48), dp(44)));
+    header.addView(speedButton, new LinearLayout.LayoutParams(dp(46), dp(40)));
     Button menu = button("Menu", () -> showHome(true));
-    menu.setBackground(medallionShape(0xff213652, 0xff142338, 0x88edbb73, 14));
-    LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(dp(60), dp(44));
+    menu.setBackground(medallionShape(0xff213652, 0xff142338, 0x88edbb73, 12));
+    LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(dp(60), dp(40));
     mp.leftMargin = dp(6);
     header.addView(menu, mp);
     root.addView(header);
 
-    LinearLayout almanacWrap = vertical();
-    almanacWrap.setPadding(dp(10), dp(4), dp(10), dp(5));
-    almanacWrap.setBackgroundColor(0xff091220);
-    metrics = text("", 12, MINT, true);
-    metrics.setPadding(dp(12), dp(6), dp(12), dp(6));
-    metrics.setBackground(medallionShape(0xff172a42, 0xff101d30, 0x6677d7c8, 12));
-    almanacWrap.addView(metrics, new LinearLayout.LayoutParams(-1, -2));
-
     HorizontalScrollView tickerScroll = new HorizontalScrollView(this);
     tickerScroll.setHorizontalScrollBarEnabled(false);
+    tickerScroll.setBackgroundColor(0xff091220);
     cityTickerRow = new LinearLayout(this);
     cityTickerRow.setGravity(Gravity.CENTER_VERTICAL);
-    cityTickerRow.setPadding(0, dp(4), 0, 0);
+    cityTickerRow.setPadding(dp(10), dp(3), dp(10), dp(4));
+    cityTickerRow.setVisibility(View.GONE);
     tickerScroll.addView(cityTickerRow);
-    almanacWrap.addView(tickerScroll, new LinearLayout.LayoutParams(-1, -2));
-    root.addView(almanacWrap);
+    root.addView(tickerScroll, new LinearLayout.LayoutParams(-1, -2));
 
     LinearLayout content = new LinearLayout(this);
     wideLayout = getResources().getConfiguration().screenWidthDp >= 720;
@@ -424,11 +462,23 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
     map.bind(game, index -> panels.showHub(index));
     map.setNight(night);
     worldPane.addView(map, new FrameLayout.LayoutParams(-1, -1));
-    LinearLayout tools = new LinearLayout(this);
-    tools.setGravity(Gravity.CENTER_VERTICAL);
-    Button fit = button("Fit city", () -> map.resetCamera());
-    fit.setBackground(medallionShape(0xee1c304b, 0xee111f33, 0x77edbb73, 14));
-    tools.addView(fit, new LinearLayout.LayoutParams(dp(70), dp(42)));
+    LinearLayout toolsWrapper = new LinearLayout(this);
+    toolsWrapper.setOrientation(LinearLayout.HORIZONTAL);
+    toolsWrapper.setGravity(Gravity.CENTER_VERTICAL);
+
+    final LinearLayout toolsDrawer = new LinearLayout(this);
+    toolsDrawer.setOrientation(LinearLayout.VERTICAL);
+    toolsDrawer.setGravity(Gravity.CENTER_HORIZONTAL);
+    toolsDrawer.setPadding(dp(5), dp(6), dp(5), dp(6));
+    toolsDrawer.setBackground(medallionShape(0xee142337, 0xee0b1420, 0x77edbb73, 14));
+
+    fitButton = button("Fit", () -> map.resetCamera());
+    fitButton.setTextSize(11);
+    fitButton.setBackground(medallionShape(0xee1c304b, 0xee111f33, 0x77edbb73, 12));
+    LinearLayout.LayoutParams fp = new LinearLayout.LayoutParams(dp(56), dp(34));
+    fp.bottomMargin = dp(4);
+    toolsDrawer.addView(fitButton, fp);
+
     streetButton =
         button(
             "Streets",
@@ -436,64 +486,134 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
               map.toggleStreets();
               updateHud(true);
             });
-    streetButton.setBackground(medallionShape(0xee1c304b, 0xee111f33, 0x77edbb73, 14));
-    LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(dp(74), dp(42));
-    sp.leftMargin = dp(5);
-    tools.addView(streetButton, sp);
+    streetButton.setTextSize(11);
+    streetButton.setBackground(medallionShape(0xee1c304b, 0xee111f33, 0x77edbb73, 12));
+    LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(dp(56), dp(34));
+    sp.bottomMargin = dp(4);
+    toolsDrawer.addView(streetButton, sp);
+
     autoButton =
         button(
             "Auto",
             () -> {
               game.autoDispatch = !game.autoDispatch;
+              dispatchCollapsed = game.autoDispatch;
               game.message = "Auto dispatch " + (game.autoDispatch ? "enabled" : "disabled") + ".";
               actionDone();
             });
-    autoButton.setBackground(medallionShape(0xee1c304b, 0xee111f33, 0x7777d7c8, 14));
-    LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(dp(70), dp(42));
-    ap.leftMargin = dp(5);
-    tools.addView(autoButton, ap);
-    Button goals = button("Goals", () -> panels.overview());
-    goals.setBackground(medallionShape(0xee1c304b, 0xee111f33, 0x99edbb73, 14));
-    LinearLayout.LayoutParams gp = new LinearLayout.LayoutParams(dp(66), dp(42));
-    gp.leftMargin = dp(5);
-    tools.addView(goals, gp);
-    FrameLayout.LayoutParams tp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.END);
-    tp.setMargins(dp(10), dp(8), dp(10), 0);
-    worldPane.addView(tools, tp);
+    autoButton.setTextSize(11);
+    autoButton.setBackground(medallionShape(0xee1c304b, 0xee111f33, 0x7777d7c8, 12));
+    LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(dp(56), dp(34));
+    ap.bottomMargin = dp(4);
+    toolsDrawer.addView(autoButton, ap);
+
+    goalsButton = button("Goals", () -> panels.overview());
+    goalsButton.setTextSize(11);
+    goalsButton.setBackground(medallionShape(0xee1c304b, 0xee111f33, 0x99edbb73, 12));
+    LinearLayout.LayoutParams gp = new LinearLayout.LayoutParams(dp(56), dp(34));
+    gp.bottomMargin = dp(4);
+    toolsDrawer.addView(goalsButton, gp);
+
+    Button trackSkip =
+        button(
+            "🎵",
+            () -> {
+              soundtrack.nextTrack();
+              getPreferences(0).edit().putInt("trackIndex", soundtrack.currentTrackIndex()).apply();
+              showGameNotification("🎵 " + soundtrack.currentTrackName());
+            });
+    trackSkip.setTextSize(13);
+    trackSkip.setContentDescription("Switch soundtrack");
+    trackSkip.setBackground(medallionShape(0xee1c304b, 0xee111f33, 0x77edbb73, 12));
+    LinearLayout.LayoutParams tpBtn = new LinearLayout.LayoutParams(dp(56), dp(34));
+    toolsDrawer.addView(trackSkip, tpBtn);
+
+    toolsWrapper.addView(toolsDrawer);
+    toolsDrawer.setVisibility(View.GONE);
+
+    final Button toolsToggleBtn = button("▶", null);
+    toolsToggleBtn.setTextSize(11);
+    toolsToggleBtn.setPadding(dp(2), dp(8), dp(2), dp(8));
+    toolsToggleBtn.setBackground(medallionShape(0xee1a2c42, 0xee0e1927, 0x99edbb73, 10));
+    LinearLayout.LayoutParams tglLp = new LinearLayout.LayoutParams(dp(20), dp(58));
+    tglLp.leftMargin = dp(2);
+    toolsToggleBtn.setLayoutParams(tglLp);
+    toolsToggleBtn.setOnClickListener(
+        v -> {
+          boolean willHide = (toolsDrawer.getVisibility() == View.VISIBLE);
+          toolsDrawer.setVisibility(willHide ? View.GONE : View.VISIBLE);
+          toolsToggleBtn.setText(willHide ? "▶" : "◀");
+        });
+
+    final float[] touchStartX = new float[1];
+    toolsDrawer.setOnTouchListener(
+        (v, event) -> {
+          if (event.getAction() == MotionEvent.ACTION_DOWN) {
+            touchStartX[0] = event.getX();
+            return false;
+          } else if (event.getAction() == MotionEvent.ACTION_UP
+              || event.getAction() == MotionEvent.ACTION_CANCEL) {
+            float dx = event.getX() - touchStartX[0];
+            if (dx < -dp(20)) {
+              toolsDrawer.setVisibility(View.GONE);
+              toolsToggleBtn.setText("▶");
+              return true;
+            }
+          }
+          return false;
+        });
+
+    toolsWrapper.addView(toolsToggleBtn);
+    FrameLayout.LayoutParams tp =
+        new FrameLayout.LayoutParams(-2, -2, Gravity.START | Gravity.CENTER_VERTICAL);
+    tp.leftMargin = dp(4);
+    worldPane.addView(toolsWrapper, tp);
+
+    notificationBanner = text("", 12, INK, true);
+    notificationBanner.setVisibility(View.GONE);
+    notificationBanner.setPadding(dp(14), dp(8), dp(14), dp(8));
+    notificationBanner.setBackground(medallionShape(0xf2182b46, 0xf20f1b2d, 0xaaedbb73, 14));
+    notificationBanner.setElevation(dp(8));
+    FrameLayout.LayoutParams nlp =
+        new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+    nlp.topMargin = dp(46);
+    worldPane.addView(notificationBanner, nlp);
 
     goalBox = vertical();
-    goalBox.setPadding(dp(14), dp(11), dp(14), dp(11));
-    goalBox.setBackground(medallionShape(0xf2192b45, 0xf2101d31, 0x99edbb73, 18));
+    goalBox.setPadding(dp(13), dp(10), dp(13), dp(10));
+    goalBox.setBackground(medallionShape(0xf2192b45, 0xf2101d31, 0xaaedbb73, 18));
     goalBox.setElevation(dp(7));
-    LinearLayout eyebrowRow = new LinearLayout(this);
-    eyebrowRow.setGravity(Gravity.CENTER_VERTICAL);
-    TextView eyebrow = text("ADVISOR  ·  MISSION SCROLL", 9, AMBER, true);
-    eyebrow.setLetterSpacing(.12f);
-    eyebrowRow.addView(eyebrow, new LinearLayout.LayoutParams(0, -2, 1));
-    goalCollapseButton =
-        button(
-            "–",
-            () -> {
-              goalCollapsed = !goalCollapsed;
-              if (goalBody != null) goalBody.setVisibility(goalCollapsed ? View.GONE : View.VISIBLE);
-              goalCollapseButton.setText(goalCollapsed ? "+" : "–");
-            });
-    goalCollapseButton.setMinHeight(dp(26));
+    LinearLayout advisorTopRow = new LinearLayout(this);
+    advisorTopRow.setGravity(Gravity.CENTER_VERTICAL);
+    advisorAvatar = new ImageView(this);
+    advisorAvatar.setImageDrawable(BrandArt.advisorPortraitDrawable(density));
+    LinearLayout.LayoutParams avLp = new LinearLayout.LayoutParams(dp(44), dp(44));
+    avLp.rightMargin = dp(10);
+    advisorTopRow.addView(advisorAvatar, avLp);
+    LinearLayout advisorHeadCol = vertical();
+    goalEyebrow = text("CHIEF DISPATCHER MAYA", 10, AMBER, true);
+    goalEyebrow.setLetterSpacing(.10f);
+    advisorHeadCol.addView(goalEyebrow);
+    goalTitle = text("YOUR COMPANY", 17, INK, true);
+    goalTitle.setPadding(0, dp(2), 0, 0);
+    advisorHeadCol.addView(goalTitle);
+    advisorTopRow.addView(advisorHeadCol, new LinearLayout.LayoutParams(0, -2, 1));
+    goalCollapseButton = button("+", () -> toggleGoalBox());
+    goalCollapseButton.setMinHeight(dp(28));
     goalCollapseButton.setPadding(dp(6), dp(2), dp(6), dp(2));
-    LinearLayout.LayoutParams collapseLp = new LinearLayout.LayoutParams(dp(30), dp(26));
+    LinearLayout.LayoutParams collapseLp = new LinearLayout.LayoutParams(dp(40), dp(28));
     collapseLp.setMargins(dp(6), 0, 0, 0);
     goalCollapseButton.setLayoutParams(collapseLp);
-    eyebrowRow.addView(goalCollapseButton);
-    goalBox.addView(eyebrowRow);
-
-    goalTitle = text("YOUR COMPANY", 16, INK, true);
-    goalTitle.setPadding(0, dp(5), 0, dp(3));
-    goalBox.addView(goalTitle);
+    advisorTopRow.addView(goalCollapseButton);
+    advisorTopRow.setOnClickListener(v -> toggleGoalBox());
+    goalBox.addView(advisorTopRow);
 
     goalBody = vertical();
-    goalDetail = text("", 12, MUTED, false);
+    goalBody.setVisibility(View.GONE);
+    goalDetail = text("", 14, INK, false);
+    goalDetail.setPadding(0, dp(6), 0, 0);
     goalBody.addView(goalDetail);
-    campaignGoalText = text("", 11, MINT, true);
+    campaignGoalText = text("", 12, MINT, true);
     campaignGoalText.setPadding(0, dp(4), 0, 0);
     goalBody.addView(campaignGoalText);
     chapterProgress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
@@ -501,8 +621,8 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
     chapterProgress.setProgressTintList(android.content.res.ColorStateList.valueOf(AMBER));
     chapterProgress.setProgressBackgroundTintList(
         android.content.res.ColorStateList.valueOf(0xff2a3e57));
-    LinearLayout.LayoutParams progressLayout = new LinearLayout.LayoutParams(-1, dp(5));
-    progressLayout.topMargin = dp(8);
+    LinearLayout.LayoutParams progressLayout = new LinearLayout.LayoutParams(-1, dp(6));
+    progressLayout.topMargin = dp(7);
     goalBody.addView(chapterProgress, progressLayout);
     goalAction = button("Next step", () -> goalPressed());
     primary(goalAction);
@@ -510,23 +630,19 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
     goalBox.addView(goalBody);
     FrameLayout.LayoutParams goalParams =
         new FrameLayout.LayoutParams(
-            dp(Math.min(286, getResources().getConfiguration().screenWidthDp - 26)),
+            dp(Math.min(340, getResources().getConfiguration().screenWidthDp - 24)),
             -2,
             Gravity.TOP | Gravity.START);
-    goalParams.setMargins(dp(12), dp(88), 0, 0);
+    goalParams.setMargins(dp(12), dp(8), dp(12), 0);
     worldPane.addView(goalBox, goalParams);
     dispatch = vertical();
-    dispatch.setPadding(dp(9), dp(6), dp(9), dp(6));
+    dispatch.setPadding(dp(8), dp(4), dp(8), dp(4));
     FrameLayout.LayoutParams deck = new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM);
-    deck.bottomMargin = dp(36);
+    deck.bottomMargin = dp(6);
     worldPane.addView(dispatch, deck);
     mapCaption = text("Connecting street map…", 10, MUTED, false);
-    mapCaption.setPadding(dp(10), dp(5), dp(10), dp(5));
-    mapCaption.setBackground(shape(0xe6101c2e, 7));
-    FrameLayout.LayoutParams caption =
-        new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.START);
-    caption.setMargins(dp(12), dp(60), dp(8), 0);
-    worldPane.addView(mapCaption, caption);
+    mapCaption.setVisibility(View.GONE);
+    worldPane.addView(mapCaption, new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.START));
     content.addView(
         worldPane, new LinearLayout.LayoutParams(wideLayout ? 0 : -1, wideLayout ? -1 : 0, 1));
     managementScroll = new ScrollView(this);
@@ -538,25 +654,58 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
         new LinearLayout.LayoutParams(
             wideLayout ? dp(360) : -1, wideLayout ? -1 : 0, wideLayout ? 0 : 1));
     managementScroll.setVisibility(View.GONE);
-    message = text("", 10, MUTED, false);
+    message = text("", 12, MUTED, false);
     message.setMaxLines(1);
     message.setEllipsize(android.text.TextUtils.TruncateAt.END);
-    message.setPadding(dp(16), dp(5), dp(16), dp(5));
+    message.setPadding(dp(12), dp(3), dp(12), dp(3));
+    message.setVisibility(View.GONE);
     root.addView(message);
     nav = new LinearLayout(this);
-    nav.setPadding(dp(8), dp(5), dp(8), dp(7));
+    nav.setPadding(dp(6), dp(4), dp(6), dp(4));
     for (int i = 0; i < tabs.length; i++) {
       final int index = i;
       Button item = button(tabLabel(i), () -> selectTab(index));
       item.setTextSize(10);
-      item.setCompoundDrawablePadding(dp(4));
+      item.setPadding(dp(2), dp(4), dp(2), dp(4));
+      item.setCompoundDrawablePadding(dp(2));
       item.setCompoundDrawablesWithIntrinsicBounds(
           null, BrandArt.icon(i, MUTED, getResources().getDisplayMetrics().density), null, null);
-      LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(0, dp(64), 1);
+      LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(0, dp(52), 1);
       np.setMargins(dp(2), 0, dp(2), 0);
       nav.addView(item, np);
     }
     root.addView(nav);
+  }
+
+  private boolean tutorialTabRelevant(int tabIdx) {
+    if (game == null || game.gameMode != Game.MODE_TUTORIAL || game.tutorialStep >= 8) return true;
+    int maxTab = new int[] {0, 0, 0, 1, 2, 2, 3, 4}[Math.max(0, Math.min(7, game.tutorialStep))];
+    return tabIdx <= maxTab;
+  }
+
+  private int unreadReportCount() {
+    int count = 0;
+    if (game != null) for (Game.Report r : game.reports) if (!r.read) count++;
+    return count;
+  }
+
+  private void refreshNavTabs() {
+    int unread = unreadReportCount();
+    for (int i = 0; i < nav.getChildCount(); i++) {
+      Button b = (Button) nav.getChildAt(i);
+      String label = tabLabel(i);
+      if (i == 5 && unread > 0 && (game == null || game.gameMode != Game.MODE_TUTORIAL))
+        label = label + " (" + unread + ")";
+      b.setText(label);
+      b.setTextColor(i == tab ? BG : MUTED);
+      b.setBackground(shape(i == tab ? AMBER : BG, 13));
+      b.setAlpha(tutorialTabRelevant(i) ? 1f : 0.42f);
+      b.setCompoundDrawablesWithIntrinsicBounds(
+          null,
+          BrandArt.icon(i, i == tab ? BG : MUTED, getResources().getDisplayMetrics().density),
+          null,
+          null);
+    }
   }
 
   void selectTab(int value) {
@@ -568,23 +717,19 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
             ? View.VISIBLE
             : View.GONE);
     dispatch.setVisibility(tab == 0 ? View.VISIBLE : View.GONE);
-    for (int i = 0; i < nav.getChildCount(); i++) {
-      Button b = (Button) nav.getChildAt(i);
-      b.setText(tabLabel(i));
-      b.setTextColor(i == tab ? BG : MUTED);
-      b.setBackground(shape(i == tab ? AMBER : BG, 13));
-      b.setCompoundDrawablesWithIntrinsicBounds(
-          null,
-          BrandArt.icon(i, i == tab ? BG : MUTED, getResources().getDisplayMetrics().density),
-          null,
-          null);
-    }
+    refreshNavTabs();
     if (tab > 0) renderManagement();
     requestKey = "";
     updateHud(true);
   }
 
   private void updateHud(boolean force) {
+    if (game.gameMode == Game.MODE_TUTORIAL && game.tutorialStep < 8 && game.tutorialReady()) {
+      if (game.advanceTutorial()) {
+        force = true;
+        if (sound) soundtrack.playCue(BackgroundMusic.CUE_FANFARE);
+      }
+    }
     String cityDisplay =
         game.currentScenario().city
             + (game.branchCount() > 1 ? " ▾ (" + game.branchCount() + " Cities)" : "");
@@ -604,7 +749,9 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
     speedButton.setContentDescription(
         game.speed == 0 ? "Resume simulation" : "Change speed. Currently " + game.speed + " times");
     message.setText(saveError != null ? saveError : game.message);
+    message.setVisibility(saveError != null ? View.VISIBLE : View.GONE);
     updateGoal();
+    refreshNavTabs();
     if (chapterProgress != null) {
       int progress =
           game.gameMode == Game.MODE_TUTORIAL
@@ -620,13 +767,27 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
         meter.setProgress((int) Math.max(0, 65000 - (game.elapsed - request.created) * 1000));
     }
     if (mapCaption != null) mapCaption.setText(map.status());
+    boolean inTutorial = game.gameMode == Game.MODE_TUTORIAL && game.tutorialStep < 8;
     if (autoButton != null) {
+      autoButton.setVisibility(inTutorial ? View.GONE : View.VISIBLE);
       autoButton.setText(game.autoDispatch ? "Auto on" : "Manual");
       autoButton.setTextColor(game.autoDispatch ? MINT : INK);
     }
-    if (streetButton != null) streetButton.setText(map.isUsingStreets() ? "Streets" : "Offline");
+    if (streetButton != null) {
+      streetButton.setVisibility(inTutorial ? View.GONE : View.VISIBLE);
+      streetButton.setText(map.isUsingStreets() ? "Streets" : "Offline");
+    }
+    if (goalsButton != null) {
+      goalsButton.setText(
+          game.unclaimedCareerRewards > 0
+              ? ("Goals 🎁 Lv" + game.founderLevel)
+              : ("Goals · Lv" + game.founderLevel + " (" + game.unlockedMedalCount() + "/12)"));
+    }
+    boolean showTicker = !inTutorial && (game.branchCount() > 1 || !game.ventures.isEmpty());
     String tKey =
-        game.scenarioId
+        showTicker
+            + ":"
+            + game.scenarioId
             + ":"
             + game.branchCount()
             + ":"
@@ -637,71 +798,75 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
             + game.globalFleetCount();
     if (cityTickerRow != null && (force || !tKey.equals(tickerKey))) {
       tickerKey = tKey;
+      cityTickerRow.setVisibility(showTicker ? View.VISIBLE : View.GONE);
       cityTickerRow.removeAllViews();
-      Button ceoPill =
-          button(
-              "👤 "
-                  + game.founderName
-                  + ": "
-                  + Game.money(game.founderCash)
-                  + " · CEO: "
-                  + game.activeFounderCeoCompanyName(),
-              () -> panels.overview());
-      ceoPill.setTextSize(10);
-      ceoPill.setMinHeight(dp(28));
-      ceoPill.setPadding(dp(10), dp(2), dp(10), dp(2));
-      ceoPill.setBackground(medallionShape(0xff1e334e, 0xff111e32, 0x88edbb73, 10));
-      LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-2, dp(28));
-      cp.setMargins(0, 0, dp(5), 0);
-      cityTickerRow.addView(ceoPill, cp);
-
-      for (int cIdx = 0; cIdx < game.branches.length; cIdx++) {
-        if (!game.branches[cIdx]) continue;
-        final int targetCity = cIdx;
-        boolean active = (cIdx == game.scenarioId);
-        Button cityBtn =
+      if (showTicker) {
+        Button ceoPill =
             button(
-                (active ? "● " : "✈ ")
-                    + game.regions[cIdx]
-                    + " ("
-                    + game.cityFleetCount(cIdx)
-                    + "🚋)",
-                () -> {
-                  if (targetCity != game.scenarioId) {
-                    game.switchCity(targetCity);
-                    map.bind(game, idx -> panels.showHub(idx));
-                    map.resetCamera();
-                    actionDone();
-                  }
-                });
-        cityBtn.setTextSize(10);
-        cityBtn.setMinHeight(dp(28));
-        cityBtn.setPadding(dp(9), dp(2), dp(9), dp(2));
-        if (active) primary(cityBtn);
-        else cityBtn.setBackground(medallionShape(0xff182b44, 0xff0f1c2e, 0x5577d7c8, 10));
-        LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-2, dp(28));
-        bp.setMargins(0, 0, dp(5), 0);
-        cityTickerRow.addView(cityBtn, bp);
+                "👤 "
+                    + game.founderName
+                    + ": "
+                    + Game.money(game.founderCash)
+                    + " · CEO: "
+                    + game.activeFounderCeoCompanyName(),
+                () -> panels.overview());
+        ceoPill.setTextSize(11);
+        ceoPill.setMinHeight(dp(28));
+        ceoPill.setPadding(dp(10), dp(2), dp(10), dp(2));
+        ceoPill.setBackground(medallionShape(0xff1e334e, 0xff111e32, 0x88edbb73, 10));
+        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-2, dp(28));
+        cp.setMargins(0, 0, dp(5), 0);
+        cityTickerRow.addView(ceoPill, cp);
+
+        for (int cIdx = 0; cIdx < game.branches.length; cIdx++) {
+          if (!game.branches[cIdx]) continue;
+          final int targetCity = cIdx;
+          boolean active = (cIdx == game.scenarioId);
+          Button cityBtn =
+              button(
+                  (active ? "● " : "✈ ")
+                      + game.regions[cIdx]
+                      + " ("
+                      + game.cityFleetCount(cIdx)
+                      + "🚋)",
+                  () -> {
+                    if (targetCity != game.scenarioId) {
+                      game.switchCity(targetCity);
+                      map.bind(game, idx -> panels.showHub(idx));
+                      map.resetCamera();
+                      actionDone();
+                    }
+                  });
+          cityBtn.setTextSize(11);
+          cityBtn.setMinHeight(dp(28));
+          cityBtn.setPadding(dp(9), dp(2), dp(9), dp(2));
+          if (active) primary(cityBtn);
+          else cityBtn.setBackground(medallionShape(0xff182b44, 0xff0f1c2e, 0x5577d7c8, 10));
+          LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-2, dp(28));
+          bp.setMargins(0, 0, dp(5), 0);
+          cityTickerRow.addView(cityBtn, bp);
+        }
       }
     }
-    String key = game.requests.toString() + ":" + game.autoDispatch;
+    String key = game.requests.toString() + ":" + game.autoDispatch + ":" + dispatchCollapsed;
     if (tab == 0 && (force || !key.equals(requestKey))) {
       requestKey = key;
       renderDispatch();
     }
-    if (news != null && !home) {
+    if (news != null && !home && !inTutorial) {
       news.collect(game);
-      if (!modalOpen() && tab == 0) {
-        Game.Report pending = null;
-        for (Game.Report r : game.reports)
-          if (!r.read && (pending == null || r.urgent)) {
-            pending = r;
-            if (r.urgent) break;
-          }
-        if (pending != null && (pending.urgent || game.elapsed - lastEdition >= 20)) {
-          showReport(pending);
-          lastEdition = game.elapsed;
+      Game.Report pending = null;
+      for (Game.Report r : game.reports)
+        if (!r.read && (pending == null || r.urgent)) {
+          pending = r;
+          if (r.urgent) break;
         }
+      if (pending != null && !pending.id.equals(lastNewsNoticeId)) {
+        lastNewsNoticeId = pending.id;
+        lastEdition = game.elapsed;
+        game.message = "📰 News: " + pending.title + " (Read in News tab)";
+        showGameNotification(game.message);
+        refreshNavTabs();
       }
     }
   }
@@ -724,22 +889,37 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
   }
 
   private void updateGoal() {
-    if (campaignGoalText != null) {
-      campaignGoalText.setText(
-          game.gameMode == Game.MODE_TUTORIAL
-              ? "Academy Charter · Complete all 8 steps"
-              : "Victory Goal: " + game.objectiveText());
+    boolean inTutorial = game.gameMode == Game.MODE_TUTORIAL;
+    if (goalEyebrow != null) {
+      goalEyebrow.setText(
+          inTutorial
+              ? (game.tutorialStep < 8
+                  ? "CHIEF DISPATCHER MAYA · STEP " + game.tutorialStep + " OF 7"
+                  : "CHIEF DISPATCHER MAYA · GRADUATED")
+              : "ADVISOR · MISSION SCROLL");
     }
-    if (game.gameMode == Game.MODE_TUTORIAL) {
+    if (campaignGoalText != null) {
+      campaignGoalText.setVisibility(inTutorial ? View.GONE : View.VISIBLE);
+      campaignGoalText.setText("Victory Goal: " + game.objectiveText());
+    }
+    if (inTutorial) {
       goalTitle.setText(
           game.tutorialStep < 8
               ? getString(R.string.academy_step, game.tutorialStep)
               : getString(R.string.academy_graduate));
       goalDetail.setText(tasks[Math.min(8, game.tutorialStep)]);
-      goalAction.setText(
-          game.tutorialStep == 8
-              ? "Continue building"
-              : game.tutorialReady() ? "Complete task" : "Show me where");
+      if (game.tutorialStep == 8) {
+        goalAction.setText("Start Free Play →");
+      } else if (game.tutorialReady()) {
+        goalAction.setText("Complete Step ✓");
+      } else if (game.tutorialStep == 1) {
+        goalAction.setText("Dispatch First Car →");
+      } else if (game.tutorialStep == 2) {
+        goalAction.setText("⚡ Complete Trip →");
+      } else {
+        String targetTabName = tabLabel(new int[] {0, 0, 0, 1, 2, 2, 3, 4}[game.tutorialStep]);
+        goalAction.setText("Open " + targetTabName + " →");
+      }
       return;
     }
     if (game.chapter < 6) {
@@ -757,6 +937,21 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
       goalDetail.setText(game.objectiveText());
       goalAction.setText(R.string.company_overview);
     }
+    boolean hasReadyUpdate =
+        inTutorial
+            ? (game.tutorialReady() || game.tutorialStep == 8)
+            : (game.chapter < 6 ? chapterValue() >= targets[game.chapter] : game.scenarioWon);
+    if (hasReadyUpdate) goalHasUnread = true;
+    if (goalCollapseButton != null) {
+      if (goalCollapsed) {
+        goalCollapseButton.setText(goalHasUnread ? "+ ●" : "+");
+        if (goalHasUnread && goalEyebrow != null) {
+          goalEyebrow.setText(goalEyebrow.getText() + "  ●  UPDATE");
+        }
+      } else {
+        goalCollapseButton.setText("–");
+      }
+    }
   }
 
   private void goalPressed() {
@@ -769,7 +964,19 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
       if (game.tutorialReady()) {
         game.advanceTutorial();
         actionDone();
-      } else selectTab(new int[] {0, 0, 0, 1, 2, 2, 3, 4}[game.tutorialStep]);
+        return;
+      }
+      if (game.tutorialStep == 1 && !game.requests.isEmpty()) {
+        game.dispatch(game.requests.get(0).id);
+        actionDone();
+        return;
+      }
+      if (game.tutorialStep == 2) {
+        for (int i = 0; i < 120 && !game.tutorialReady(); i++) game.tick(0.25);
+        actionDone();
+        return;
+      }
+      selectTab(new int[] {0, 0, 0, 1, 2, 2, 3, 4}[game.tutorialStep]);
       return;
     }
     if (game.chapter >= 6) {
@@ -791,17 +998,47 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
         scrollX = dispatch.getChildAt(i).getScrollX();
     dispatch.removeAllViews();
     requestMeters.clear();
-    TextView deckTitle =
-        text(
-            game.autoDispatch
-                ? "AUTO DISPATCH  /  LIVE DEMAND"
-                : "DISPATCH BOARD  /  " + game.requests.size() + " WAITING",
-            9,
-            MINT,
-            true);
-    deckTitle.setLetterSpacing(.12f);
-    deckTitle.setPadding(dp(5), 0, 0, dp(7));
-    dispatch.addView(deckTitle);
+
+    LinearLayout deckHeader = new LinearLayout(this);
+    deckHeader.setGravity(Gravity.CENTER_VERTICAL);
+    deckHeader.setPadding(dp(10), dp(4), dp(8), dp(4));
+    deckHeader.setBackground(medallionShape(0xe8132236, 0xe80d1828, 0x6677d7c8, 12));
+    String headerLabel =
+        game.autoDispatch
+            ? ("⚡ AUTO-DISPATCH  ·  "
+                + game.requests.size()
+                + " queued  ·  "
+                + game.idleCount()
+                + " idle")
+            : ("DISPATCH BOARD  ·  " + game.requests.size() + " WAITING");
+    TextView deckTitle = text(headerLabel, 11, MINT, true);
+    deckTitle.setLetterSpacing(.08f);
+    deckTitle.setSingleLine(true);
+    deckTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
+    deckHeader.addView(deckTitle, new LinearLayout.LayoutParams(0, -2, 1));
+
+    Button deckToggle =
+        button(
+            dispatchCollapsed ? "+" : "–",
+            () -> {
+              dispatchCollapsed = !dispatchCollapsed;
+              updateHud(true);
+            });
+    deckToggle.setTextSize(12);
+    deckToggle.setMinHeight(dp(24));
+    deckToggle.setPadding(dp(6), 0, dp(6), 0);
+    deckHeader.addView(deckToggle, new LinearLayout.LayoutParams(dp(34), dp(24)));
+    deckHeader.setOnClickListener(
+        v -> {
+          dispatchCollapsed = !dispatchCollapsed;
+          updateHud(true);
+        });
+    LinearLayout.LayoutParams hLp = new LinearLayout.LayoutParams(-1, -2);
+    hLp.bottomMargin = dispatchCollapsed ? 0 : dp(5);
+    dispatch.addView(deckHeader, hLp);
+
+    if (dispatchCollapsed) return;
+
     HorizontalScrollView scroll = new HorizontalScrollView(this);
     scroll.setHorizontalScrollBarEnabled(false);
     LinearLayout row = new LinearLayout(this);
@@ -809,20 +1046,20 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
     dispatch.addView(scroll);
     if (game.requests.isEmpty()) {
       LinearLayout ready = vertical();
-      ready.setPadding(dp(15), dp(12), dp(15), dp(12));
+      ready.setPadding(dp(12), dp(9), dp(12), dp(9));
       ready.setBackground(shape(0xee142238, 14));
       ready.addView(
           text(
               game.autoDispatch
                   ? "Your network is working."
                   : "The next opportunity is on its way.",
-              15,
+              14,
               INK,
               true));
       ready.addView(
           text(
               game.idleCount() + " available vehicles · " + game.rides + " completed trips",
-              11,
+              12,
               MUTED,
               false));
       row.addView(ready, new LinearLayout.LayoutParams(-1, -2));
@@ -830,18 +1067,18 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
     }
     for (Game.Ride ride : new ArrayList<>(game.requests)) {
       LinearLayout ticket = vertical();
-      ticket.setPadding(dp(13), dp(11), dp(13), dp(10));
-      ticket.setBackground(medallionShape(0xf21b2d47, 0xf2111e32, ride.kindColor(), 15));
+      ticket.setPadding(dp(10), dp(8), dp(10), dp(8));
+      ticket.setBackground(medallionShape(0xf21b2d47, 0xf2111e32, ride.kindColor(), 14));
       LinearLayout badge = new LinearLayout(this);
       badge.setGravity(Gravity.CENTER_VERTICAL);
-      TextView category = text(ride.kindName(), 9, ride.kindColor(), true);
-      category.setLetterSpacing(.10f);
+      TextView category = text(ride.kindName(), 10, ride.kindColor(), true);
+      category.setLetterSpacing(.08f);
       badge.addView(category, new LinearLayout.LayoutParams(0, -2, 1));
       long netRev = game.estimatedIncome(ride);
-      badge.addView(text("+" + Game.money(netRev), 13, MINT, true));
+      badge.addView(text("+" + Game.money(netRev), 14, MINT, true));
       ticket.addView(badge);
-      TextView origin = text(game.districts.get(ride.from).name, 15, INK, true);
-      origin.setPadding(0, dp(6), 0, dp(2));
+      TextView origin = text(game.districts.get(ride.from).name, 14, INK, true);
+      origin.setPadding(0, dp(3), 0, dp(1));
       origin.setSingleLine(true);
       origin.setEllipsize(android.text.TextUtils.TruncateAt.END);
       ticket.addView(origin);
@@ -849,9 +1086,9 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
           text(
               "→ "
                   + game.districts.get(ride.to).name
-                  + " · Tariff "
+                  + " · "
                   + Game.money(ride.fare),
-              11,
+              12,
               MUTED,
               false);
       destination.setSingleLine(true);
@@ -864,7 +1101,7 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
       patience.setProgressBackgroundTintList(
           android.content.res.ColorStateList.valueOf(0xff293c55));
       LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(-1, dp(3));
-      pp.topMargin = dp(9);
+      pp.topMargin = dp(6);
       ticket.addView(patience, pp);
       requestMeters.put(ride.id, patience);
       Button send =
@@ -880,7 +1117,7 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
               + game.districts.get(ride.from).name
               + " to "
               + game.districts.get(ride.to).name);
-      send.setMinHeight(dp(44));
+      send.setMinHeight(dp(38));
       if (getResources().getConfiguration().screenHeightDp >= 480) ticket.addView(send);
       else {
         ticket.setOnClickListener(
@@ -891,8 +1128,8 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
         ticket.setFocusable(true);
         ticket.setContentDescription(send.getContentDescription());
       }
-      LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(dp(248), -2);
-      p.rightMargin = dp(9);
+      LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(dp(224), -2);
+      p.rightMargin = dp(8);
       row.addView(ticket, p);
     }
     final int position = scrollX;
@@ -972,6 +1209,14 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
   }
 
   void actionDone() {
+    if (game.gameMode == Game.MODE_TUTORIAL && game.tutorialStep < 8 && game.tutorialReady()) {
+      game.advanceTutorial();
+      if (sound) soundtrack.playCue(BackgroundMusic.CUE_FANFARE);
+      if (tab > 0 && game.tutorialStep < 8) {
+        int nextTab = new int[] {0, 0, 0, 1, 2, 2, 3, 4}[game.tutorialStep];
+        if (nextTab == 0) selectTab(0);
+      }
+    }
     updateHud(true);
     map.invalidate();
     if (tab > 0) renderManagement();
@@ -980,7 +1225,238 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
     if (sound) {
       soundtrack.playCue(cue != 0 ? cue : BackgroundMusic.CUE_CASH);
     }
-    Toast.makeText(this, game.message, Toast.LENGTH_SHORT).show();
+    showGameNotification(game.message);
+  }
+
+  private void toggleGoalBox() {
+    goalCollapsed = !goalCollapsed;
+    if (goalBody != null) goalBody.setVisibility(goalCollapsed ? View.GONE : View.VISIBLE);
+    goalHasUnread = false;
+    if (goalCollapseButton != null) goalCollapseButton.setText(goalCollapsed ? "+" : "–");
+    if (goalEyebrow != null) goalEyebrow.setText("CHIEF DISPATCHER MAYA");
+    updateHud(true);
+  }
+
+  void showGameNotification(String msg) {
+    if (msg == null || msg.trim().isEmpty()) return;
+    if (notificationBanner != null) {
+      notificationBanner.setText(msg);
+      notificationBanner.setVisibility(View.VISIBLE);
+      notificationBanner.removeCallbacks(hideNotificationRunnable);
+      notificationBanner.postDelayed(hideNotificationRunnable, 2800);
+    }
+  }
+
+  void showAnnualMeetingModal() {
+    if (game == null) return;
+    LinearLayout body = vertical();
+    body.setPadding(dp(14), dp(10), dp(14), dp(10));
+
+    // Investor Confidence Card
+    LinearLayout sentCard = vertical();
+    sentCard.setPadding(dp(12), dp(10), dp(12), dp(10));
+    sentCard.setBackground(medallionShape(0xff182b44, 0xff101e30, 0x66edbb73, 14));
+    LinearLayout.LayoutParams scLp = new LinearLayout.LayoutParams(-1, -2);
+    scLp.bottomMargin = dp(10);
+    sentCard.setLayoutParams(scLp);
+
+    int approval = game.investorApprovalRating;
+    String mood =
+        approval >= 75
+            ? "★ STRONG BUY · High Investor Confidence"
+            : (approval >= 50
+                ? "HOLD · Stable Governance"
+                : "CONCERNED · Board Demands Capital Efficiency");
+    sentCard.addView(text("BOARD OF DIRECTORS & SHAREHOLDERS", 10, AMBER, true));
+    sentCard.addView(
+        text(
+            approval + "% Investor Approval Rating",
+            17,
+            approval >= 75 ? MINT : (approval >= 50 ? AMBER : 0xffed8d73),
+            true));
+    sentCard.addView(text(mood, 11, MUTED, false));
+    body.addView(sentCard);
+
+    // Performance Ledger Card
+    LinearLayout ledCard = vertical();
+    ledCard.setPadding(dp(12), dp(10), dp(12), dp(10));
+    ledCard.setBackground(medallionShape(0xff16273d, 0xff0f1b2c, 0x5577d7c8, 14));
+    LinearLayout.LayoutParams lcLp = new LinearLayout.LayoutParams(-1, -2);
+    lcLp.bottomMargin = dp(10);
+    ledCard.setLayoutParams(lcLp);
+
+    ledCard.addView(text("COMPANY PERFORMANCE LEDGER", 10, MINT, true));
+    ledCard.addView(
+        text("Gross Fares: " + game.formatCityMoney(game.lastYearRevenue), 13, INK, false));
+    ledCard.addView(
+        text("Operating Expenses: " + game.formatCityMoney(game.lastYearExpenses), 13, INK, false));
+    long netProfit = game.lastYearProfit;
+    ledCard.addView(
+        text(
+            "Net Operating Profit: "
+                + (netProfit >= 0 ? "+" : "")
+                + game.formatCityMoney(netProfit),
+            14,
+            netProfit >= 0 ? MINT : 0xffed8d73,
+            true));
+    ledCard.addView(
+        text("Annual Hauls: " + game.lastYearRides + " trips completed", 12, MUTED, false));
+    ledCard.addView(
+        text("Company Valuation: " + game.formatCityMoney(game.netWorth()), 13, AMBER, true));
+    body.addView(ledCard);
+
+    // Active Fleet Ledger Card
+    LinearLayout fleetCard = vertical();
+    fleetCard.setPadding(dp(12), dp(10), dp(12), dp(10));
+    fleetCard.setBackground(medallionShape(0xff16273d, 0xff0f1b2c, 0x5577d7c8, 14));
+    LinearLayout.LayoutParams fcLp = new LinearLayout.LayoutParams(-1, -2);
+    fcLp.bottomMargin = dp(10);
+    fleetCard.setLayoutParams(fcLp);
+    fleetCard.addView(text("FLEET ASSET PERFORMANCE", 10, AMBER, true));
+    for (Game.Taxi t : game.taxis) {
+      fleetCard.addView(
+          text(
+              "Consist #"
+                  + t.id
+                  + " ("
+                  + t.tierName()
+                  + ") · "
+                  + t.tripsCompleted
+                  + " trips · "
+                  + game.formatCityMoney(t.totalFareEarned)
+                  + " earned · "
+                  + (int) t.condition
+                  + "% Cond",
+              11,
+              INK,
+              false));
+    }
+    body.addView(fleetCard);
+
+    // Route & Hub Origination Ledger Card
+    LinearLayout routeCard = vertical();
+    routeCard.setPadding(dp(12), dp(10), dp(12), dp(10));
+    routeCard.setBackground(medallionShape(0xff16273d, 0xff0f1b2c, 0x5577d7c8, 14));
+    LinearLayout.LayoutParams rcLp = new LinearLayout.LayoutParams(-1, -2);
+    rcLp.bottomMargin = dp(10);
+    routeCard.setLayoutParams(rcLp);
+    routeCard.addView(text("ROUTE & HUB PERFORMANCE", 10, MINT, true));
+    for (Game.District d : game.districts) {
+      if (!d.open && d.tripsOriginating == 0) continue;
+      routeCard.addView(
+          text(
+              d.name
+                  + " ("
+                  + d.levelName()
+                  + ") · "
+                  + d.tripsOriginating
+                  + " trips · "
+                  + game.formatCityMoney(d.revenueOriginating),
+              11,
+              INK,
+              false));
+    }
+    body.addView(routeCard);
+
+    // Executive Compensation & Dividend Governance
+    LinearLayout govCard = vertical();
+    govCard.setPadding(dp(12), dp(10), dp(12), dp(10));
+    govCard.setBackground(medallionShape(0xff182b44, 0xff101e30, 0x66edbb73, 14));
+    LinearLayout.LayoutParams gcLp = new LinearLayout.LayoutParams(-1, -2);
+    gcLp.bottomMargin = dp(10);
+    govCard.setLayoutParams(gcLp);
+    govCard.addView(text("EXECUTIVE COMPENSATION & DIVIDENDS", 10, AMBER, true));
+
+    final TextView salText =
+        text(
+            "CEO Salary: " + game.formatCityMoney(game.founderSalaryRate) + " / quarter",
+            13,
+            INK,
+            true);
+    govCard.addView(salText);
+    LinearLayout salRow = new LinearLayout(this);
+    Button cutSal =
+        button(
+            "Reduce -50",
+            () -> {
+              game.adjustCeoSalary(-50);
+              salText.setText(
+                  "CEO Salary: " + game.formatCityMoney(game.founderSalaryRate) + " / quarter");
+            });
+    cutSal.setTextSize(11);
+    Button raiseSal =
+        button(
+            "Raise +50",
+            () -> {
+              game.adjustCeoSalary(50);
+              salText.setText(
+                  "CEO Salary: " + game.formatCityMoney(game.founderSalaryRate) + " / quarter");
+            });
+    raiseSal.setTextSize(11);
+    LinearLayout.LayoutParams sBtnLp = new LinearLayout.LayoutParams(0, dp(34), 1);
+    sBtnLp.rightMargin = dp(4);
+    salRow.addView(cutSal, sBtnLp);
+    salRow.addView(raiseSal, new LinearLayout.LayoutParams(0, dp(34), 1));
+    govCard.addView(salRow);
+
+    final TextView divText =
+        text(
+            "Corporate Dividend: "
+                + game.formatCityMoney(game.corporateDividendRate)
+                + " / distribution",
+            13,
+            INK,
+            true);
+    divText.setPadding(0, dp(6), 0, 0);
+    govCard.addView(divText);
+    LinearLayout divRow = new LinearLayout(this);
+    Button cutDiv =
+        button(
+            "Retain Cash -50",
+            () -> {
+              game.adjustCorporateDividend(-50);
+              divText.setText(
+                  "Corporate Dividend: "
+                      + game.formatCityMoney(game.corporateDividendRate)
+                      + " / distribution");
+            });
+    cutDiv.setTextSize(11);
+    Button raiseDiv =
+        button(
+            "Reward Investors +50",
+            () -> {
+              game.adjustCorporateDividend(50);
+              divText.setText(
+                  "Corporate Dividend: "
+                      + game.formatCityMoney(game.corporateDividendRate)
+                      + " / distribution");
+            });
+    raiseDiv.setTextSize(11);
+    LinearLayout.LayoutParams dBtnLp = new LinearLayout.LayoutParams(0, dp(34), 1);
+    dBtnLp.rightMargin = dp(4);
+    divRow.addView(cutDiv, dBtnLp);
+    divRow.addView(raiseDiv, new LinearLayout.LayoutParams(0, dp(34), 1));
+    govCard.addView(divRow);
+
+    body.addView(govCard);
+
+    Button adjournBtn =
+        button(
+            "Ratify Resolutions & Adjourn Meeting ✓",
+            () -> {
+              dismissCurrent();
+              actionDone();
+            });
+    primary(adjournBtn);
+    body.addView(adjournBtn);
+
+    showThemedModal(
+        "ANNUAL INVESTORS MEETING",
+        "Fiscal Year " + (game.year() - 1) + " Annual Report",
+        "Review fleet performance ledger and vote on executive salary and dividend policy.",
+        body,
+        "Close",
+        null);
   }
 
   private void renderManagement() {
@@ -1278,6 +1754,10 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
             }));
     page.addView(
         button(
+            "🎵 Tycoon Radio · " + soundtrack.currentTrackName(),
+            () -> showRadioModal(canContinue)));
+    page.addView(
+        button(
             sound
                 ? "Button sounds on · incident & cash chimes"
                 : "Button sounds off · tap to enable",
@@ -1292,6 +1772,10 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
         button(
             "Language / Idioma / 言語 · " + currentLanguageName(),
             () -> showLanguageModal(canContinue)));
+    page.addView(
+        button(
+            "🌐 Multiplayer & Cloud Backup (PeerSplit E2EE)",
+            () -> showPeerMultiplayerModal()));
     if (saveError != null) page.addView(text(saveError, 12, AMBER, false));
     TextView foot =
         text(
@@ -1310,6 +1794,330 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
           if (canContinue) home = false;
           else finish();
         });
+  }
+
+  private void showRadioModal(boolean canContinue) {
+    LinearLayout list = vertical();
+    Button nextBtn =
+        button(
+            "⏭ Skip to Next Track · " + soundtrack.currentTrackName(),
+            () -> {
+              soundtrack.nextTrack();
+              getPreferences(0).edit().putInt("trackIndex", soundtrack.currentTrackIndex()).apply();
+              dismissCurrent();
+              showRadioModal(canContinue);
+            });
+    primary(nextBtn);
+    list.addView(nextBtn);
+    list.addView(
+        button(
+            soundtrack.isAutoRotate()
+                ? "🔁 Auto-Rotate Playlist: ON"
+                : "🔁 Auto-Rotate Playlist: OFF (Loop Current)",
+            () -> {
+              boolean nextVal = !soundtrack.isAutoRotate();
+              soundtrack.setAutoRotate(nextVal);
+              getPreferences(0).edit().putBoolean("radioAuto", nextVal).apply();
+              dismissCurrent();
+              showRadioModal(canContinue);
+            }));
+    for (int i = 0; i < soundtrack.trackCount(); i++) {
+      final int idx = i;
+      boolean active = (i == soundtrack.currentTrackIndex());
+      Button trackBtn =
+          button(
+              (active ? "▶ " : "🎵 ") + BackgroundMusic.TRACK_NAMES[i],
+              () -> {
+                soundtrack.selectTrack(idx);
+                getPreferences(0).edit().putInt("trackIndex", idx).apply();
+                dismissCurrent();
+                showRadioModal(canContinue);
+              });
+      if (active) primary(trackBtn);
+      list.addView(trackBtn);
+    }
+    showThemedModal(
+        "TYCOON RADIO  ·  6 SOUNDTRACKS",
+        "Select Soundtrack Station",
+        "Switch between 6 offline Tycoon Radio tracks inspired by classic transport and city games.",
+        list,
+        "Back",
+        () -> showHome(canContinue));
+  }
+
+  void showPeerMultiplayerModal() {
+    LinearLayout body = vertical();
+
+    // 1. PeerSplit Multiplayer Lobby Section
+    LinearLayout multiCard = vertical();
+    multiCard.setPadding(dp(14), dp(12), dp(14), dp(12));
+    multiCard.setBackground(shape(0xff182b44, 14));
+    multiCard.addView(
+        text("🌐 PEERSPLIT P2P MULTIPLAYER ROOM", 15, AMBER, true));
+    multiCard.addView(
+        text(
+            "Host or join a serverless tycoon match. Share an encrypted Room Envelope with a friend to import their real company into your stock market!",
+            12,
+            MUTED,
+            false));
+
+    Button hostBtn =
+        button(
+            "⚡ Create Room & Export My Company Envelope",
+            () -> {
+              try {
+                String code = PeerSyncCrypto.generateRoomCode();
+                String envelope = PeerMultiplayerSync.exportMultiplayerRoomEnvelope(game, code);
+                showExportEnvelopeModal("MULTIPLAYER ROOM ENVELOPE", code, envelope);
+              } catch (Exception e) {
+                Toast.makeText(this, "Export failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+              }
+            });
+    primary(hostBtn);
+    multiCard.addView(hostBtn);
+
+    Button joinBtn =
+        button(
+            "📥 Join Room & Import Friend's Company",
+            () -> showImportRoomModal());
+    multiCard.addView(joinBtn);
+    body.addView(multiCard);
+
+    // 2. Serverless Encrypted Cloud Backup Section
+    LinearLayout backupCard = vertical();
+    backupCard.setPadding(dp(14), dp(12), dp(14), dp(12));
+    backupCard.setBackground(shape(0xff111e32, 14));
+    LinearLayout.LayoutParams bLp = new LinearLayout.LayoutParams(-1, -2);
+    bLp.topMargin = dp(10);
+    backupCard.addView(
+        text("🔐 SERVERLESS E2EE CLOUD BACKUP", 15, MINT, true));
+    backupCard.addView(
+        text(
+            "Zero central servers. Back up your entire empire with AES-GCM-256 encryption. Restore across any phone using your passphrase.",
+            12,
+            MUTED,
+            false));
+
+    Button exportBackupBtn =
+        button(
+            "📤 Export Encrypted Save Backup",
+            () -> showCreateBackupPassphraseModal());
+    backupCard.addView(exportBackupBtn);
+
+    Button importBackupBtn =
+        button(
+            "📥 Restore Encrypted Save Backup",
+            () -> showRestoreBackupModal());
+    backupCard.addView(importBackupBtn);
+    body.addView(backupCard, bLp);
+
+    showThemedModal(
+        "PEERSPLIT MULTIPLAYER & ZERO-SERVER SYNC",
+        "E2EE Decentralized Exchange",
+        "Uses PeerSplit / Nostr end-to-end encrypted protocol. No accounts, no central servers, 100% private.",
+        body,
+        "Close",
+        null);
+  }
+
+  private void showExportEnvelopeModal(String title, String roomCode, String envelope) {
+    LinearLayout body = vertical();
+    body.addView(text("ROOM ACCESS CODE:", 12, AMBER, true));
+    EditText codeView = new EditText(this);
+    codeView.setText(roomCode);
+    codeView.setTextColor(INK);
+    codeView.setBackgroundColor(0xff0b1524);
+    codeView.setTextSize(16);
+    codeView.setEnabled(false);
+    body.addView(codeView);
+
+    TextView instr = text("Encrypted Peer Envelope (Share this code or text with your rival):", 12, MUTED, false);
+    LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(-1, -2);
+    ip.topMargin = dp(8);
+    body.addView(instr, ip);
+
+    EditText envelopeView = new EditText(this);
+    envelopeView.setText(envelope);
+    envelopeView.setTextColor(MINT);
+    envelopeView.setTextSize(10);
+    envelopeView.setBackgroundColor(0xff09101d);
+    envelopeView.setMaxLines(8);
+    envelopeView.setLines(6);
+    body.addView(envelopeView);
+
+    Button copyBtn =
+        button(
+            "📋 Copy Room Envelope to Clipboard",
+            () -> {
+              android.content.ClipboardManager cb =
+                  (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+              if (cb != null) {
+                cb.setPrimaryClip(android.content.ClipData.newPlainText("Fareforge Room", roomCode + "\n" + envelope));
+                Toast.makeText(this, "Copied Room Code & Envelope!", Toast.LENGTH_SHORT).show();
+              }
+            });
+    primary(copyBtn);
+    body.addView(copyBtn);
+
+    showThemedModal(
+        title,
+        "Room: " + roomCode,
+        "Your friend enters this Room Code and envelope to compete against your company in their market.",
+        body,
+        "Done",
+        null);
+  }
+
+  private void showImportRoomModal() {
+    LinearLayout body = vertical();
+    body.addView(text("Enter 12-char Room Code (e.g. FORGE-8A2F9C):", 12, AMBER, true));
+    final EditText codeInput = new EditText(this);
+    codeInput.setHint("FORGE-XXXXXX");
+    codeInput.setTextColor(INK);
+    codeInput.setHintTextColor(MUTED);
+    body.addView(codeInput);
+
+    TextView epText = text("Paste Friend's Encrypted Room Envelope:", 12, MUTED, false);
+    LinearLayout.LayoutParams ep = new LinearLayout.LayoutParams(-1, -2);
+    ep.topMargin = dp(6);
+    body.addView(epText, ep);
+
+    final EditText envInput = new EditText(this);
+    envInput.setHint("-----BEGIN FAREFORGE MULTIPLAYER ROOM-----\n...");
+    envInput.setTextColor(INK);
+    envInput.setHintTextColor(MUTED);
+    envInput.setLines(5);
+    body.addView(envInput);
+
+    Button importAction =
+        button(
+            "⚔ Import Peer Company into Stock Market",
+            () -> {
+              String code = codeInput.getText().toString().trim();
+              String env = envInput.getText().toString().trim();
+              if (code.isEmpty() || env.isEmpty()) {
+                Toast.makeText(this, "Please enter both Room Code and Envelope", Toast.LENGTH_SHORT).show();
+                return;
+              }
+              try {
+                PeerMultiplayerSync.PeerRivalProfile rival =
+                    PeerMultiplayerSync.parsePeerRival(env, code);
+                boolean ok = PeerMultiplayerSync.injectRivalIntoGame(game, rival);
+                if (ok) {
+                  actionDone();
+                  dismissCurrent();
+                  Toast.makeText(
+                          this,
+                          "Imported rival: " + rival.companyName + " by " + rival.founderName + "!",
+                          Toast.LENGTH_LONG)
+                      .show();
+                  selectTab(4); // Switch to Market tab
+                }
+              } catch (Exception e) {
+                Toast.makeText(this, "Invalid Room Envelope or Code: " + e.getMessage(), Toast.LENGTH_LONG).show();
+              }
+            });
+    primary(importAction);
+    body.addView(importAction);
+
+    showThemedModal(
+        "IMPORT MULTIPLAYER RIVAL",
+        "PeerSplit Matchmaking",
+        "Decrypts your friend's company and places them on your Stock Exchange for competitive trading and buyout mergers.",
+        body,
+        "Cancel",
+        null);
+  }
+
+  private void showCreateBackupPassphraseModal() {
+    LinearLayout body = vertical();
+    body.addView(text("Set a Secure Passphrase or Key to Encrypt Save:", 12, AMBER, true));
+    final EditText passInput = new EditText(this);
+    passInput.setHint("e.g. secret-mobility-vault-2026");
+    passInput.setTextColor(INK);
+    passInput.setHintTextColor(MUTED);
+    body.addView(passInput);
+
+    Button createBtn =
+        button(
+            "🔒 Encrypt & Export Save",
+            () -> {
+              String pass = passInput.getText().toString().trim();
+              if (pass.length() < 4) {
+                Toast.makeText(this, "Passphrase must be at least 4 characters", Toast.LENGTH_SHORT).show();
+                return;
+              }
+              try {
+                String backup = PeerMultiplayerSync.exportEncryptedBackup(game, pass);
+                dismissCurrent();
+                showExportEnvelopeModal("ENCRYPTED BACKUP ENVELOPE", "KEY PROTECTED", backup);
+              } catch (Exception e) {
+                Toast.makeText(this, "Encryption failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+              }
+            });
+    primary(createBtn);
+    body.addView(createBtn);
+
+    showThemedModal(
+        "E2EE SAVE BACKUP",
+        "Serverless Zero-Knowledge Vault",
+        "Your save is encrypted with AES-GCM on this device before leaving. No server can ever read it.",
+        body,
+        "Cancel",
+        null);
+  }
+
+  private void showRestoreBackupModal() {
+    LinearLayout body = vertical();
+    body.addView(text("Enter Backup Passphrase:", 12, AMBER, true));
+    final EditText passInput = new EditText(this);
+    passInput.setTextColor(INK);
+    body.addView(passInput);
+
+    TextView envLabel = text("Paste Encrypted Backup Envelope:", 12, MUTED, false);
+    LinearLayout.LayoutParams elp = new LinearLayout.LayoutParams(-1, -2);
+    elp.topMargin = dp(6);
+    body.addView(envLabel, elp);
+
+    final EditText envInput = new EditText(this);
+    envInput.setHint("-----BEGIN FAREFORGE ENCRYPTED BACKUP-----\n...");
+    envInput.setTextColor(INK);
+    envInput.setHintTextColor(MUTED);
+    envInput.setLines(6);
+    body.addView(envInput);
+
+    Button restoreBtn =
+        button(
+            "🔓 Decrypt & Restore Save",
+            () -> {
+              String pass = passInput.getText().toString().trim();
+              String env = envInput.getText().toString().trim();
+              if (pass.isEmpty() || env.isEmpty()) {
+                Toast.makeText(this, "Passphrase and backup content required", Toast.LENGTH_SHORT).show();
+                return;
+              }
+              try {
+                Game restoredGame = PeerMultiplayerSync.importEncryptedBackup(env, pass);
+                game = restoredGame;
+                home = false;
+                actionDone();
+                dismissCurrent();
+                selectTab(0);
+                Toast.makeText(this, "Restored " + game.companyName + " successfully!", Toast.LENGTH_LONG).show();
+              } catch (Exception e) {
+                Toast.makeText(this, "Restore failed (Check passphrase or envelope): " + e.getMessage(), Toast.LENGTH_LONG).show();
+              }
+            });
+    primary(restoreBtn);
+    body.addView(restoreBtn);
+
+    showThemedModal(
+        "RESTORE ENCRYPTED SAVE",
+        "E2EE Zero-Server Restore",
+        "Restores your empire without requiring any server account or cloud database.",
+        body,
+        "Cancel",
+        null);
   }
 
   private String currentLanguageName() {
@@ -1360,20 +2168,29 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
       LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
       lp.bottomMargin = dp(8);
       item.setLayoutParams(lp);
-      item.addView(text(sc.city + " · " + sc.country, 16, AMBER, true));
-      item.addView(text(sc.title + " — " + sc.goalText, 11, MUTED, false));
-      Button pick =
+      item.addView(text(sc.city + " · " + sc.country, 17, AMBER, true));
+      item.addView(text(sc.title, 13, MUTED, false));
+      Button quickLaunch =
           button(
-              "Establish Flagship HQ in " + sc.city + " →",
-              () -> main.post(() -> chooseQuickGoal(cityIdx)));
-      primary(pick);
-      item.addView(pick);
+              "⚡ Quick Start in " + sc.city + " →",
+              () ->
+                  startNew(
+                      () -> {
+                        game = new Game();
+                        game.startQuickPlay(cityIdx, Game.GOAL_WORTH_5CR, Game.DIFF_MEDIUM);
+                        game.autoDispatch = true;
+                      },
+                      false));
+      primary(quickLaunch);
+      item.addView(quickLaunch);
+      item.addView(
+          button("Customize Goal & Company Name…", () -> main.post(() -> chooseQuickGoal(cityIdx))));
       list.addView(item);
     }
     showThemedModal(
-        "STEP 1 OF 4  ·  HEADQUARTERS TERRITORY",
+        "QUICK PLAY  ·  SELECT CITY",
         "Choose Your Starting City",
-        "Select where your flagship company will incorporate. You can expand to other cities and spin off sister companies later.",
+        "Tap Quick Start to jump right in, or customize your goal and company details.",
         list,
         "Back to Main Menu",
         () -> showHome(saves.exists()));
@@ -1398,7 +2215,7 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
       lp.bottomMargin = dp(8);
       item.setLayoutParams(lp);
       item.addView(text(badges[i % badges.length], 9, MINT, true));
-      item.addView(text(Game.QUICK_GOAL_NAMES[i], 14, INK, true));
+      item.addView(text(Game.quickGoalNameForCity(i, city), 14, INK, true));
       Button pick =
           button(
               "Select Ambition →",
@@ -1477,11 +2294,24 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
               9,
               MINT,
               true));
-      item.addView(text(h.title, 16, AMBER, true));
-      item.addView(text("Charter Goal: " + h.objective, 12, INK, false));
-      Button launch =
+      item.addView(text(h.title, 17, AMBER, true));
+      item.addView(text(h.objective, 13, INK, false));
+      Button playNow =
           button(
-              "Incorporate & Launch Scenario #" + (i + 1) + " →",
+              "⚡ Play Scenario #" + (i + 1) + " →",
+              () ->
+                  startNew(
+                      () -> {
+                        game = new Game();
+                        game.startHistoricalScenario(index);
+                        game.autoDispatch = true;
+                      },
+                      false));
+      primary(playNow);
+      item.addView(playNow);
+      item.addView(
+          button(
+              "Customize Founder & Equity…",
               () ->
                   main.post(
                       () ->
@@ -1491,9 +2321,7 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
                                 game = new Game();
                                 game.startHistoricalScenario(index);
                                 game.autoDispatch = true;
-                              })));
-      primary(launch);
-      item.addView(launch);
+                              }))));
       list.addView(item);
     }
     showThemedModal(
@@ -1848,6 +2676,7 @@ public final class MainActivity extends Activity implements Choreographer.FrameC
   private void saveAsync() {
     if (home || game == null || closed) return;
     try {
+      game.lastActiveTimestampMs = System.currentTimeMillis();
       byte[] bytes = SaveCodec.encode(game);
       DISK.execute(
           () -> {

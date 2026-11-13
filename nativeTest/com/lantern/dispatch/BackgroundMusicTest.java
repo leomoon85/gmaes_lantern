@@ -94,4 +94,21 @@ public class BackgroundMusicTest {
     music.resume();
     assertNull(player());
   }
+
+  @Test
+  public void multiTrackPlaylistCyclesAcrossAllSixSoundtracks() {
+    assertEquals(6, music.trackCount());
+    music.resume();
+    assertEquals(0, music.currentTrackIndex());
+    assertEquals(R.raw.city_evening, Shadows.shadowOf(player()).getSourceResId());
+    for (int i = 1; i < 6; i++) {
+      music.nextTrack();
+      assertEquals(i, music.currentTrackIndex());
+      assertEquals(BackgroundMusic.TRACK_IDS[i], Shadows.shadowOf(player()).getSourceResId());
+      assertTrue(player().isPlaying());
+    }
+    music.nextTrack();
+    assertEquals(0, music.currentTrackIndex());
+    assertEquals(R.raw.city_evening, Shadows.shadowOf(player()).getSourceResId());
+  }
 }

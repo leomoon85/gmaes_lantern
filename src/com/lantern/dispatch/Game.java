@@ -341,7 +341,33 @@ public final class Game implements java.io.Serializable {
         4,
         3,
         6,
-        65)
+        65),
+    new HistoricalScenarioDef(
+        20,
+        1,
+        2013,
+        2022,
+        "London Thames Triple-Rival Dogfight",
+        "London 2013–2022",
+        "Multi-AI War: Acquire 2 AI rivals fielding 4 fleet units & reach £65,000",
+        65000L,
+        3,
+        1,
+        6,
+        50),
+    new HistoricalScenarioDef(
+        21,
+        3,
+        2015,
+        2025,
+        "Tokyo 4-Way Megacity AI Turf War",
+        "Tokyo 2015–2025",
+        "Multi-AI Megacorp Hegemony: Outlast 3 AI rivals (5 fleet each) & reach ¥75,000",
+        75000L,
+        4,
+        1,
+        6,
+        55)
   };
 
   public static final class Scenario {
@@ -522,6 +548,60 @@ public final class Game implements java.io.Serializable {
   public int founderCeoTarget = -1;
   public String flagshipHiredCeoName = "Vikram Rao";
   public int pendingSoundCue = 0;
+  public int founderXp = 0;
+  public int founderLevel = 1;
+  public long unclaimedCareerRewards = 0L;
+  public boolean[] medals = new boolean[12];
+  public int dailyStreak = 1;
+  public long lastCheckInEpochDay = 0L;
+  public long lastActiveTimestampMs = 0L;
+
+  public static final String[] RANK_TITLES = {
+    "Street Dispatcher",
+    "Depot Supervisor",
+    "Fleet Captain",
+    "Corridor Architect",
+    "Regional Director",
+    "Transit Mogul",
+    "Boardroom Baron",
+    "Continental Tycoon",
+    "Global Chairman",
+    "Mobility Emperor"
+  };
+
+  public static final String[] MEDAL_NAMES = {
+    "First Dispatch",
+    "Regulars' Choice",
+    "Century Express",
+    "Fleet Commander",
+    "Full Grid Network",
+    "Mega Terminal Architect",
+    "Maglev Pioneer",
+    "Executive Cabinet",
+    "Five-Star Crown",
+    "Wall Street Raider",
+    "Serial Entrepreneur",
+    "Global Empire"
+  };
+
+  public static final String[] MEDAL_DESCS = {
+    "Complete your 1st passenger or parcel trip",
+    "Complete 25 total trips across your network",
+    "Complete 100 total trips across your network",
+    "Expand your fleet to 4 or more vehicles",
+    "Open all 6 district stations in a city",
+    "Upgrade any station to a Level 3 Mega Terminal",
+    "Upgrade a vehicle or corridor to Tier 3",
+    "Hire 3 or more executive managers",
+    "Achieve 4.90★+ service rating with 10+ completed trips",
+    "Acquire and merge a rival transport company",
+    "Own 3 or more companies/ventures in your portfolio",
+    "Operate active transit branches in 3+ world cities"
+  };
+
+  public static final long[] MEDAL_REWARDS = {
+    250L, 600L, 1500L, 800L, 1200L, 1000L, 1100L, 1200L, 1400L, 2000L, 2200L, 3000L
+  };
   public final ArrayList<String> seenNews = new ArrayList<>();
   public final ArrayList<Report> reports = new ArrayList<>();
   public final ArrayList<Venture> ventures = new ArrayList<>();
@@ -549,6 +629,14 @@ public final class Game implements java.io.Serializable {
   public long marginDebt = 0, dividends = 0;
   public int historyStage = 0, marginCalls = 0, marketTick = 0;
   public int bonds = 0, restructurings = 0;
+  public int lastAnnualMeetingYear = 0;
+  public long annualRevenue = 0L, annualExpenses = 0L;
+  public int annualRides = 0;
+  public long lastYearRevenue = 0L, lastYearExpenses = 0L, lastYearProfit = 0L;
+  public int lastYearRides = 0;
+  public int investorApprovalRating = 85;
+  public boolean annualMeetingPending = false;
+  public long corporateDividendRate = 400L;
   public final ArrayList<Company> companies = new ArrayList<>();
   public int speed = 1, nextRide = 1, spawnSequence = 0;
   public boolean autoDispatch = false, milestone = false;
@@ -592,6 +680,8 @@ public final class Game implements java.io.Serializable {
     public final int x, y, color;
     public boolean open;
     public int level = 1, facilities = 0;
+    public int tripsOriginating = 0;
+    public long revenueOriginating = 0L;
     public final int[] supply = new int[] {2, 1, 0, 0};
     public final int[] demandMult = new int[] {120, 130, 140, 125};
 
@@ -667,6 +757,8 @@ public final class Game implements java.io.Serializable {
         comfortLevel = 1;
     public double progress = 0, charge = 0, condition = 100.0, cleanliness = 100.0, comfort = 80.0;
     public boolean broken = false, strictRoute = false;
+    public int tripsCompleted = 0, distanceTraveled = 0;
+    public long totalFareEarned = 0L;
     public int[] path;
     public Ride ride;
     public final ArrayList<Integer> routeStops = new ArrayList<>();
@@ -687,7 +779,7 @@ public final class Game implements java.io.Serializable {
 
   public static final class Company implements java.io.Serializable {
     private static final long serialVersionUID = 1L;
-    public final String name;
+    public String name;
     public final int district, color;
     public int price, owned = 0, fleet;
     public int hubsOpen = 2, corridorLevel = 1, strategy = 0;
@@ -980,6 +1072,264 @@ public final class Game implements java.io.Serializable {
     return n;
   }
 
+  public void normalizeCareerState() {
+    if (medals == null || medals.length != 12) medals = new boolean[12];
+    if (founderLevel < 1) founderLevel = 1;
+    if (founderXp < 0) founderXp = 0;
+    if (unclaimedCareerRewards < 0) unclaimedCareerRewards = 0;
+    if (dailyStreak < 1) dailyStreak = 1;
+  }
+
+  public String founderRankTitle() {
+    return RANK_TITLES[Math.max(0, Math.min(RANK_TITLES.length - 1, founderLevel - 1))];
+  }
+
+  public int xpForNextLevel() {
+    return Math.max(150, founderLevel * 150);
+  }
+
+  public int xpProgressPct() {
+    return Math.max(0, Math.min(100, (int) ((founderXp * 100L) / Math.max(1, xpForNextLevel()))));
+  }
+
+  public int hiredManagerCount() {
+    int count = 0;
+    for (Manager m : managers) if (m.hired) count++;
+    return count;
+  }
+
+  public int unlockedMedalCount() {
+    if (medals == null) return 0;
+    int count = 0;
+    for (boolean m : medals) if (m) count++;
+    return count;
+  }
+
+  private double medalCompletionRatio(int idx) {
+    switch (idx) {
+      case 0:
+        return Math.min(1.0, rides);
+      case 1:
+        return Math.min(1.0, rides / 25.0);
+      case 2:
+        return Math.min(1.0, rides / 100.0);
+      case 3:
+        return Math.min(1.0, globalFleetCount() / 4.0);
+      case 4:
+        return Math.min(1.0, openCount() / 6.0);
+      case 5:
+        {
+          int maxLv = 1;
+          for (District d : districts) if (d.level > maxLv) maxLv = d.level;
+          return maxLv >= 3 ? 1.0 : (maxLv - 1) / 2.0;
+        }
+      case 6:
+        {
+          int maxT = 1;
+          for (Taxi t : taxis) if (t.tier > maxT) maxT = t.tier;
+          for (int ct : corridorTier) if (ct > maxT) maxT = ct;
+          return maxT >= 3 ? 1.0 : (maxT - 1) / 2.0;
+        }
+      case 7:
+        return Math.min(1.0, hiredManagerCount() / 3.0);
+      case 8:
+        return rides >= 10 && rating >= 4.90
+            ? 1.0
+            : Math.min(0.95, (rides / 10.0) * 0.5 + Math.max(0, (rating - 4.5) / 0.4) * 0.5);
+      case 9:
+        {
+          int maxOwn = 0;
+          for (Company c : companies) {
+            if (c.merged) return 1.0;
+            if (c.owned > maxOwn) maxOwn = c.owned;
+          }
+          return Math.min(0.95, maxOwn / 60.0);
+        }
+      case 10:
+        return Math.min(1.0, ownedCompanyCount() / 3.0);
+      case 11:
+        return Math.min(1.0, branchCount() / 3.0);
+      default:
+        return 0.0;
+    }
+  }
+
+  public int nextLockedMedalIndex() {
+    normalizeCareerState();
+    int best = -1;
+    double bestRatio = -1.0;
+    for (int i = 0; i < medals.length; i++) {
+      if (medals[i]) continue;
+      double r = medalCompletionRatio(i);
+      if (r > bestRatio) {
+        bestRatio = r;
+        best = i;
+      }
+    }
+    return best;
+  }
+
+  public String medalProgressText(int idx) {
+    switch (idx) {
+      case 0:
+        return Math.min(1, rides) + " / 1 trip";
+      case 1:
+        return Math.min(25, rides) + " / 25 trips";
+      case 2:
+        return Math.min(100, rides) + " / 100 trips";
+      case 3:
+        return Math.min(4, globalFleetCount()) + " / 4 vehicles";
+      case 4:
+        return Math.min(6, openCount()) + " / 6 hubs";
+      case 5:
+        {
+          int maxLv = 1;
+          for (District d : districts) if (d.level > maxLv) maxLv = d.level;
+          return "Max Station Lv" + maxLv + " / 3";
+        }
+      case 6:
+        {
+          int maxT = 1;
+          for (Taxi t : taxis) if (t.tier > maxT) maxT = t.tier;
+          for (int ct : corridorTier) if (ct > maxT) maxT = ct;
+          return "Max Tier " + maxT + " / 3";
+        }
+      case 7:
+        return Math.min(3, hiredManagerCount()) + " / 3 managers";
+      case 8:
+        return String.format(Locale.US, "%.2f★ / 4.90★ (%d/10 trips)", rating, Math.min(10, rides));
+      case 9:
+        {
+          boolean any = false;
+          int maxOwn = 0;
+          for (Company c : companies) {
+            if (c.merged) any = true;
+            if (c.owned > maxOwn) maxOwn = c.owned;
+          }
+          return any ? "Merged!" : (maxOwn + "% / 60% buyout threshold");
+        }
+      case 10:
+        return Math.min(3, ownedCompanyCount()) + " / 3 companies";
+      case 11:
+        return Math.min(3, branchCount()) + " / 3 cities";
+      default:
+        return "";
+    }
+  }
+
+  public void awardXp(int amount) {
+    normalizeCareerState();
+    if (amount <= 0) return;
+    founderXp += amount;
+    while (founderXp >= xpForNextLevel()) {
+      founderXp -= xpForNextLevel();
+      founderLevel++;
+      unclaimedCareerRewards += founderLevel * 400L;
+      pendingSoundCue = CUE_FANFARE;
+    }
+    evaluateMedals();
+  }
+
+  public int evaluateMedals() {
+    normalizeCareerState();
+    boolean hasLv3Hub = false;
+    for (District d : districts) if (d.level >= 3) hasLv3Hub = true;
+    boolean hasTier3 = false;
+    for (Taxi t : taxis) if (t.tier >= 3) hasTier3 = true;
+    if (!hasTier3) {
+      for (int ct : corridorTier) {
+        if (ct >= 3) {
+          hasTier3 = true;
+          break;
+        }
+      }
+    }
+    boolean hasMergedRival = false;
+    for (Company c : companies) if (c.merged) hasMergedRival = true;
+    boolean[] met = {
+      rides >= 1,
+      rides >= 25,
+      rides >= 100,
+      globalFleetCount() >= 4,
+      openCount() >= 6,
+      hasLv3Hub,
+      hasTier3,
+      hiredManagerCount() >= 3,
+      rides >= 10 && rating >= 4.90,
+      hasMergedRival,
+      ownedCompanyCount() >= 3,
+      branchCount() >= 3
+    };
+    int unlockedNow = 0;
+    for (int i = 0; i < medals.length && i < met.length; i++) {
+      if (!medals[i] && met[i]) {
+        medals[i] = true;
+        unclaimedCareerRewards += MEDAL_REWARDS[i];
+        unlockedNow++;
+        pendingSoundCue = CUE_FANFARE;
+      }
+    }
+    return unlockedNow;
+  }
+
+  public boolean claimCareerRewards() {
+    evaluateMedals();
+    if (unclaimedCareerRewards <= 0) return false;
+    long grant = unclaimedCareerRewards;
+    unclaimedCareerRewards = 0L;
+    cash += grant;
+    long personalBonus = Math.max(100L, grant / 4L);
+    founderCash += personalBonus;
+    pendingSoundCue = CUE_FANFARE;
+    message =
+        "🏅 Claimed +"
+            + money(grant)
+            + " grant (+"
+            + money(personalBonus)
+            + " personal) at Lv"
+            + founderLevel
+            + " "
+            + founderRankTitle()
+            + "!";
+    return true;
+  }
+
+  public long evaluateDailyAndOfflineComeback(long nowEpochMs) {
+    normalizeCareerState();
+    if (nowEpochMs <= 0L) return 0L;
+    if (lastActiveTimestampMs > 0L && nowEpochMs < lastActiveTimestampMs) {
+      return 0L;
+    }
+    long before = unclaimedCareerRewards;
+    long epochDay = nowEpochMs / 86_400_000L;
+    if (lastCheckInEpochDay == 0L) {
+      lastCheckInEpochDay = epochDay;
+      dailyStreak = 1;
+    } else if (epochDay == lastCheckInEpochDay + 1L) {
+      dailyStreak = Math.min(30, dailyStreak + 1);
+      lastCheckInEpochDay = epochDay;
+      unclaimedCareerRewards += 300L + dailyStreak * 150L;
+      awardXp(50);
+    } else if (epochDay > lastCheckInEpochDay + 1L) {
+      dailyStreak = 1;
+      lastCheckInEpochDay = epochDay;
+      unclaimedCareerRewards += 300L;
+      awardXp(25);
+    }
+    if (lastActiveTimestampMs > 0L) {
+      long elapsedSec = Math.min(8L * 3600L, (nowEpochMs - lastActiveTimestampMs) / 1000L);
+      if (elapsedSec >= 300L) {
+        long idleGrant =
+            Math.min(
+                5000L,
+                Math.max(120L, (elapsedSec / 60L) * (taxis.size() * 6L + openCount() * 4L)));
+        unclaimedCareerRewards += idleGrant;
+      }
+    }
+    lastActiveTimestampMs = nowEpochMs;
+    return unclaimedCareerRewards - before;
+  }
+
   public void configureFounderCompany(
       String founder, String compName, int equityPct, int startHubA, int startHubB) {
     if (founder != null && !founder.trim().isEmpty()) this.founderName = founder.trim();
@@ -1103,6 +1453,7 @@ public final class Game implements java.io.Serializable {
     v.progress = 0;
     ventures.add(v);
     pendingSoundCue = CUE_FANFARE;
+    awardXp(150);
     message =
         "Founded "
             + cleanName
@@ -1254,6 +1605,16 @@ public final class Game implements java.io.Serializable {
     } else if (h.id == 17) {
       this.bonds = 3;
       this.cash = 9500;
+    } else if (h.id == 20) {
+      for (Company c : companies) {
+        c.fleet = 4;
+        c.cash = 9500;
+      }
+    } else if (h.id == 21) {
+      for (Company c : companies) {
+        c.fleet = 5;
+        c.cash = 12500;
+      }
     }
     this.message = "Scenario #" + (h.id + 1) + " [" + h.era + "]: " + h.objective;
   }
@@ -1363,6 +1724,18 @@ public final class Game implements java.io.Serializable {
     createRide(0, 1);
     createRide(1, 0);
     Scenario sc = currentScenario();
+    activeCurrencySymbol = sc.currencySymbol;
+    lastAnnualMeetingYear = 0;
+    annualRevenue = 0L;
+    annualExpenses = 0L;
+    annualRides = 0;
+    lastYearRevenue = 0L;
+    lastYearExpenses = 0L;
+    lastYearProfit = 0L;
+    lastYearRides = 0;
+    investorApprovalRating = 85;
+    annualMeetingPending = false;
+    corporateDividendRate = 400L;
     message = sc.city + " Scenario (" + sc.title + "): " + sc.goalText + ".";
   }
 
@@ -1723,6 +2096,7 @@ public final class Game implements java.io.Serializable {
     int[] p = route(districts.get(fromDist).cell(), districts.get(toDist).cell());
     spend(cost);
     for (int c : p) if (corridorTier[c] < targetTier) corridorTier[c] = targetTier;
+    awardXp(50);
     message =
         "Built Tier "
             + targetTier
@@ -1772,6 +2146,7 @@ public final class Game implements java.io.Serializable {
     }
     spend(cost);
     d.facilities |= flag;
+    awardXp(80);
     message = "Installed station facility at " + d.name + ".";
     return true;
   }
@@ -1818,6 +2193,7 @@ public final class Game implements java.io.Serializable {
     branches[i] = true;
     ensureCityBranchState(i);
     pendingSoundCue = CUE_FANFARE;
+    awardXp(150);
     message =
         "Launched "
             + regions[i]
@@ -1903,6 +2279,7 @@ public final class Game implements java.io.Serializable {
     }
     spend(cost);
     d.level++;
+    awardXp(80);
     message =
         "Upgraded "
             + d.name
@@ -1941,6 +2318,7 @@ public final class Game implements java.io.Serializable {
     t.capacity = 1 + t.tier * 2;
     t.condition = 100.0;
     t.broken = false;
+    awardXp(60);
     message =
         "Consist "
             + t.id
@@ -2018,6 +2396,7 @@ public final class Game implements java.io.Serializable {
   private void spend(long n) {
     cash -= n;
     expenses += n;
+    annualExpenses += n;
   }
 
   public boolean buyTaxi() {
@@ -2035,6 +2414,7 @@ public final class Game implements java.io.Serializable {
     Taxi vehicle = new Taxi(taxis.size() + 1, districts.get(hq).cell());
     taxis.add(vehicle);
     assignAvailableDrivers();
+    awardXp(60);
     message = "New vehicle ready at " + districts.get(hq).name + ".";
     return true;
   }
@@ -2089,6 +2469,7 @@ public final class Game implements java.io.Serializable {
     int[] p = route(districts.get(hq).cell(), d.cell());
     if (p != null) for (int c : p) if (corridorTier[c] == 0) corridorTier[c] = 1;
     createRide(i, hq);
+    awardXp(80);
     message = "Opened " + d.name + " Station and linked corridor.";
     return true;
   }
@@ -2205,6 +2586,14 @@ public final class Game implements java.io.Serializable {
       cash += income;
       revenue += income;
       rides++;
+      annualRevenue += income;
+      annualRides++;
+      t.tripsCompleted++;
+      t.totalFareEarned += income;
+      t.distanceTraveled += (t.path != null ? t.path.length : 1);
+      orig.tripsOriginating++;
+      orig.revenueOriginating += income;
+      awardXp(25);
       if (t.ride.kind == KIND_CARGO
           || orig.hasFacility(FAC_CARGO)
           || dest.hasFacility(FAC_CARGO)) {
@@ -2274,6 +2663,61 @@ public final class Game implements java.io.Serializable {
     return true;
   }
 
+  public boolean serviceAllTaxis() {
+    long unitCost = managers.size() > 0 && managers.get(0).hired ? 220L : 300L;
+    int count = 0;
+    boolean needed = false;
+    for (int i = 0; i < taxis.size(); i++) {
+      Taxi t = taxis.get(i);
+      if (t.broken || t.condition < 99.5) {
+        needed = true;
+        if (cash >= unitCost) {
+          spend(unitCost);
+          t.condition = 100.0;
+          t.broken = false;
+          count++;
+        }
+      }
+    }
+    if (!needed) {
+      message = "All vehicles are already at 100% mechanical condition.";
+      return false;
+    }
+    if (count == 0) {
+      message = "Need " + money(unitCost) + " to service fleet.";
+      return false;
+    }
+    message = "Serviced " + count + " vehicle" + (count == 1 ? "" : "s") + " (" + money(count * unitCost) + ").";
+    return true;
+  }
+
+  public boolean cleanAllTaxis() {
+    long unitCost = 120L;
+    int count = 0;
+    boolean needed = false;
+    for (int i = 0; i < taxis.size(); i++) {
+      Taxi t = taxis.get(i);
+      if (t.cleanliness < 99.5) {
+        needed = true;
+        if (cash >= unitCost) {
+          spend(unitCost);
+          t.cleanliness = 100.0;
+          count++;
+        }
+      }
+    }
+    if (!needed) {
+      message = "All vehicle cabins are already spotless.";
+      return false;
+    }
+    if (count == 0) {
+      message = "Need " + money(unitCost) + " to clean fleet.";
+      return false;
+    }
+    message = "Deep-cleaned " + count + " vehicle" + (count == 1 ? "" : "s") + " (" + money(count * unitCost) + ").";
+    return true;
+  }
+
   public boolean upgradeComfort(int idx) {
     if (idx < 0 || idx >= taxis.size()) return false;
     Taxi t = taxis.get(idx);
@@ -2295,6 +2739,7 @@ public final class Game implements java.io.Serializable {
     int id = drivers.size() + 1;
     drivers.add(new Driver(id, name != null ? name : ("Driver #" + id), 4.7, 0));
     assignAvailableDrivers();
+    awardXp(75);
     message = "Recruited " + drivers.get(drivers.size() - 1).name + ".";
     return true;
   }
@@ -2307,6 +2752,7 @@ public final class Game implements java.io.Serializable {
     if (cash < cost) return false;
     spend(cost);
     d.level++;
+    awardXp(80);
     d.skill = Math.min(5.0, d.skill + 0.12);
     message =
         "Trained "
@@ -2333,6 +2779,7 @@ public final class Game implements java.io.Serializable {
     if (m.hired || cash < m.cost) return false;
     spend(m.cost);
     m.hired = true;
+    awardXp(75);
     message = "Recruited Executive Manager: " + m.role + " (" + m.name + ").";
     return true;
   }
@@ -2588,6 +3035,7 @@ public final class Game implements java.io.Serializable {
     c.owned = 0;
     c.merged = true;
     pendingSoundCue = CUE_FANFARE;
+    awardXp(150);
     message = "Merged " + c.name + ": fleet, corridors, treasury and station integrated.";
     return true;
   }
@@ -2689,8 +3137,8 @@ public final class Game implements java.io.Serializable {
     }
 
     // 3. Quarterly Flagship Dividend when cash-rich
-    if (cash > 11000L) {
-      long autoDiv = 400L;
+    if (cash > 11000L && corporateDividendRate > 0) {
+      long autoDiv = corporateDividendRate;
       cash -= autoDiv;
       long founderCut = autoDiv * founderEquityPct / 100L;
       founderCash += founderCut;
@@ -2768,6 +3216,30 @@ public final class Game implements java.io.Serializable {
     marketClock += dt;
     competitionClock += dt;
     history();
+    int curYear = year();
+    if (lastAnnualMeetingYear == 0) {
+      lastAnnualMeetingYear = curYear;
+    } else if (curYear > lastAnnualMeetingYear && gameMode != MODE_TUTORIAL) {
+      lastYearRevenue = annualRevenue;
+      lastYearExpenses = annualExpenses;
+      lastYearRides = annualRides;
+      lastYearProfit = annualRevenue - annualExpenses;
+
+      long netGrowth = lastYearProfit;
+      int baseApproval = (int) Math.round((rating / 5.0) * 80.0);
+      if (netGrowth > 2500) baseApproval += 18;
+      else if (netGrowth > 0) baseApproval += 8;
+      else baseApproval -= 24;
+      investorApprovalRating = Math.max(30, Math.min(99, baseApproval));
+
+      annualRevenue = 0L;
+      annualExpenses = 0L;
+      annualRides = 0;
+      lastAnnualMeetingYear = curYear;
+      annualMeetingPending = true;
+      pendingSoundCue = CUE_FANFARE;
+      message = "Annual Investors Meeting convened for Fiscal Year " + (curYear - 1) + "!";
+    }
     double interval = Math.max(2.5, 9 - openCount() - totalHubLevels() * 0.25) / demandFactor();
     while (spawnClock >= interval) {
       spawnClock -= interval;
@@ -2974,18 +3446,44 @@ public final class Game implements java.io.Serializable {
       cash += 8000;
       pendingSoundCue = CUE_FANFARE;
       message =
-          "Gold Medal in " + sc.city + " (" + sc.title + ")! +8,000 cr scenario bonus awarded.";
+          "Gold Medal in " + sc.city + " (" + sc.title + ")! +" + money(8000) + " scenario bonus awarded.";
     }
     if (!milestone && branchCount() == 6 && taxis.size() >= 10 && rides >= 100) {
       milestone = true;
       cash += 15000;
       pendingSoundCue = CUE_FANFARE;
-      message = "Global network achieved! 15,000 cr growth grant received.";
+      message = "Global network achieved! " + money(15000) + " growth grant received.";
     }
   }
 
+  public static volatile String activeCurrencySymbol = "₹";
+
   public static String money(long n) {
-    return String.format(Locale.US, "%,d cr", n);
+    return activeCurrencySymbol + String.format(Locale.US, "%,d", n);
+  }
+
+  public static String quickGoalNameForCity(int goalType, int cityIdx) {
+    Scenario sc = SCENARIOS[Math.max(0, Math.min(SCENARIOS.length - 1, cityIdx))];
+    switch (goalType) {
+      case GOAL_WORTH_5CR:
+        return "Survive & Reach " + sc.currencySymbol + "312,500 Net Worth";
+      case GOAL_DEBT_FREE_IPO:
+        return "Debt-Free IPO: 0 Debt & " + sc.currencySymbol + "60,000 Net Worth";
+      default:
+        return QUICK_GOAL_NAMES[Math.max(0, Math.min(QUICK_GOAL_NAMES.length - 1, goalType))];
+    }
+  }
+
+  public boolean adjustCeoSalary(long delta) {
+    founderSalaryRate = Math.max(100L, Math.min(2500L, founderSalaryRate + delta));
+    message = "CEO Salary adjusted to " + money(founderSalaryRate) + " / quarter.";
+    return true;
+  }
+
+  public boolean adjustCorporateDividend(long delta) {
+    corporateDividendRate = Math.max(0L, Math.min(2000L, corporateDividendRate + delta));
+    message = "Corporate Dividend adjusted to " + money(corporateDividendRate) + " per distribution.";
+    return true;
   }
 
   public boolean tutorialReady() {
@@ -3011,7 +3509,7 @@ public final class Game implements java.io.Serializable {
   }
 
   public String objectiveText() {
-    if (gameMode == MODE_SOLO_QUICK) return QUICK_GOAL_NAMES[quickGoalType];
+    if (gameMode == MODE_SOLO_QUICK) return quickGoalNameForCity(quickGoalType, scenarioId);
     if (gameMode == MODE_SOLO_SCENARIO) return currentHistoricalScenario().objective;
     if (gameMode == MODE_TUTORIAL) return "Academy · step " + tutorialStep + " / 8";
     return currentScenario().goalText;

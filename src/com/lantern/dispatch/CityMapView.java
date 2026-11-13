@@ -3,6 +3,7 @@ package com.lantern.dispatch;
 import android.content.Context;
 import android.graphics.*;
 import android.view.*;
+import java.util.Locale;
 
 /** Native, offline vector city. The road network is schematic, not Google road data. */
 final class CityMapView extends View {
@@ -297,6 +298,21 @@ final class CityMapView extends View {
     canvas.drawLine(unit * .5f, 16.5f * unit, (Game.W - .5f) * unit, 16.5f * unit, paint);
     paint.setPathEffect(null);
 
+    // Bridge guardrails where avenues cross river channels
+    paint.setStyle(Paint.Style.STROKE);
+    paint.setColor(night ? 0xff73d6cf : 0xffe8c27a);
+    paint.setStrokeWidth(unit * .06f);
+    for (int by : new int[] {5, 6, 7}) {
+      float bx = 15.5f * unit;
+      canvas.drawLine(bx - unit * .34f, by * unit, bx - unit * .34f, (by + 1) * unit, paint);
+      canvas.drawLine(bx + unit * .34f, by * unit, bx + unit * .34f, (by + 1) * unit, paint);
+    }
+    for (int by : new int[] {13, 14, 15}) {
+      float bx = 5.5f * unit;
+      canvas.drawLine(bx - unit * .24f, by * unit, bx - unit * .24f, (by + 1) * unit, paint);
+      canvas.drawLine(bx + unit * .24f, by * unit, bx + unit * .24f, (by + 1) * unit, paint);
+    }
+
     // 3. Built service corridors (Tier 1 Standard, Tier 2 Express, Tier 3 Maglev Gold)
     for (int cell = 0; cell < game.corridorTier.length; cell++)
       if (game.corridorTier[cell] > 0) {
@@ -340,17 +356,36 @@ final class CityMapView extends View {
     }
 
     // 5. Rival, Subsidiary Venture & Flagship Player fleets
-    for (Game.Company company : game.companies)
-      if (!company.merged)
-        vehicle(
-            canvas,
-            company.cell,
-            company.at,
-            company.path,
-            company.progress,
-            company.color,
-            unit * .29f,
-            0);
+    for (Game.Company company : game.companies) {
+      if (company.merged) continue;
+      int rivalCars = Math.max(1, Math.min(6, company.fleet));
+      for (int f = 0; f < rivalCars; f++) {
+        if (f == 0 || company.path == null || company.path.length <= 1) {
+          vehicle(
+              canvas,
+              company.cell,
+              company.at,
+              company.path,
+              company.progress,
+              company.color,
+              unit * .29f,
+              0);
+        } else {
+          int offset = f * (company.path.length / (rivalCars + 1) + 1);
+          int vAt = (company.at + offset) % (company.path.length - 1);
+          double vProg = (company.progress + f * 0.33) % 1.0;
+          vehicle(
+              canvas,
+              company.path[vAt],
+              vAt,
+              company.path,
+              vProg,
+              company.color,
+              unit * .26f,
+              0);
+        }
+      }
+    }
     for (int vIdx = 0; vIdx < game.ventures.size(); vIdx++) {
       Game.Venture v = game.ventures.get(vIdx);
       if (!v.merged && !v.sold && v.cityId == game.scenarioId) {
@@ -415,13 +450,20 @@ final class CityMapView extends View {
     // 7. Screen-space Tropico-style station nameplates & waiting request pills
     paint.setTextAlign(Paint.Align.CENTER);
     paint.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
-    paint.setTextSize(10.5f * density);
+    paint.setTextSize(12f * density);
     for (int i = 0; i < game.districts.size(); i++) {
       Game.District hub = game.districts.get(i);
       String stars =
           hub.open
               ? (hub.level == 3 ? " ★★★" : hub.level == 2 ? " ★★" : " ★")
               : " [LOCKED]";
+      Game.Company cornerRival = null;
+      for (Game.Company c : game.companies) {
+        if (!c.merged && c.district == i) {
+          cornerRival = c;
+          break;
+        }
+      }
       String label = hub.name + stars;
       float x = screenX(hub.cell()), y = screenY(hub.cell()) + unit * zoom + 14 * density;
       float width = paint.measureText(label) + 16 * density;
@@ -439,6 +481,23 @@ final class CityMapView extends View {
       fill(night ? 0xfff5ebd6 : 0xff1f3229);
       canvas.drawText(label, x, y - 0.5f * density, paint);
 
+      if (cornerRival != null) {
+        String mono =
+            cornerRival.name.replaceAll("[^A-Za-z]", "").toUpperCase(Locale.US);
+        if (mono.length() > 2) mono = mono.substring(0, 2);
+        else if (mono.isEmpty()) mono = "AI";
+        float rx = screenX(hub.cell()) - unit * zoom * 0.72f;
+        float ry = screenY(hub.cell()) - unit * zoom * 0.65f;
+        float rw = paint.measureText(mono) + 8 * density;
+        fill(cornerRival.color);
+        rect.set(rx - rw / 2, ry - 9 * density, rx + rw / 2, ry + 4 * density);
+        canvas.drawRoundRect(rect, 6 * density, 6 * density, paint);
+        fill(0xff101c2e);
+        paint.setTextSize(9.5f * density);
+        canvas.drawText(mono, rx, ry + 1 * density, paint);
+        paint.setTextSize(12f * density);
+      }
+
       if (waitingByHub[i] > 0) {
         String badge = waitingByHub[i] + "FARE";
         float bx = screenX(hub.cell()) + unit * zoom * 0.72f;
@@ -448,9 +507,9 @@ final class CityMapView extends View {
         rect.set(bx - bw / 2, by - 9 * density, bx + bw / 2, by + 4 * density);
         canvas.drawRoundRect(rect, 6 * density, 6 * density, paint);
         fill(0xff101c2e);
-        paint.setTextSize(8.5f * density);
+        paint.setTextSize(9.5f * density);
         canvas.drawText(badge, bx, by + 0.5f * density, paint);
-        paint.setTextSize(10.5f * density);
+        paint.setTextSize(12f * density);
       }
     }
 
@@ -494,7 +553,10 @@ final class CityMapView extends View {
       float radius,
       int id) {
     float x = cellX(cell), y = cellY(cell), angle = 0;
-    if (path != null && path.length == 1) x += unit * 1.35f;
+    if (path != null && path.length == 1) {
+      x += unit * 0.20f;
+      y -= unit * 0.14f;
+    }
     if (path != null && at >= 0 && at + 1 < path.length) {
       int next = path[at + 1];
       float dx = cellX(next) - x, dy = cellY(next) - y;

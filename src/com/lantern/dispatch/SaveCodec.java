@@ -70,6 +70,7 @@ public final class SaveCodec {
       Object object = in.readObject();
       if (!(object instanceof Game)) throw new IOException("Not a game save");
       Game game = (Game) object;
+      game.normalizeCareerState();
       validate(game);
       game.assignAvailableDrivers();
       return game;
@@ -138,6 +139,15 @@ public final class SaveCodec {
     require(
         g.chapter >= 0 && g.chapter <= 6 && g.tutorialStep >= 0 && g.tutorialStep <= 8,
         "Invalid progression");
+    require(
+        g.medals != null
+            && g.medals.length == 12
+            && g.founderLevel >= 1
+            && g.founderLevel <= 500
+            && g.founderXp >= 0
+            && g.unclaimedCareerRewards >= 0
+            && g.dailyStreak >= 0,
+        "Invalid career progression");
     require(
         g.reports != null
             && g.reports.size() <= 80

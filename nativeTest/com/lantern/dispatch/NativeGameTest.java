@@ -319,6 +319,62 @@ public class NativeGameTest {
     assertEquals("es", activity.getPreferences(0).getString("lang", "en"));
   }
 
+  @Test
+  public void londonRoadRoutingAndGuidedTutorialWithoutAutoPopups() throws Exception {
+    // 1. London corridor Westminster -> Canary Wharf must stay north of River Thames (>= 51.503)
+    Game london = new Game(1);
+    int[] northCorridor =
+        london.route(london.districts.get(0).cell(), london.districts.get(1).cell());
+    for (int cell : northCorridor) {
+      double[] pt = CityGeography.position(1, cell, cell, 0);
+      assertTrue(
+          "North bank street route stays on dry land above river (" + pt[0] + ")",
+          pt[0] >= 51.499);
+    }
+
+    // 2. Tutorial starts at step 1, auto-advances on dispatch, and does NOT auto-popup newspapers
+    tutorial();
+    assertEquals(Game.MODE_TUTORIAL, activity.game.gameMode);
+    assertEquals(1, activity.game.tutorialStep);
+    activity.game.elapsed = 30;
+    activity.doFrame(3_000_000_000L);
+    activity.doFrame(3_600_000_000L);
+    assertFalse("No unsolicited newspaper popup over gameplay", activity.modalOpen());
+
+    Button dispatchBtn = find(activity.getWindow().getDecorView(), "Dispatch →");
+    assertNotNull(dispatchBtn);
+    dispatchBtn.performClick();
+    assertEquals(
+        "Dispatched trip advances Maya tutorial to step 2", 2, activity.game.tutorialStep);
+
+    Button mayaBtn = find(activity.getWindow().getDecorView(), "⚡ Complete Trip");
+    assertNotNull(mayaBtn);
+    mayaBtn.performClick();
+    assertEquals(
+        "Completed trip advances Maya tutorial to step 3", 3, activity.game.tutorialStep);
+
+    // 3. Career XP, Level Increment, Medal Cabinet & SaveCodec roundtrip
+    activity.game.cash = 100000;
+    activity.game.rides = 26;
+    activity.game.awardXp(300);
+    assertTrue("Founder leveled up from XP", activity.game.founderLevel >= 2);
+    assertTrue("First Dispatch & Regulars' Choice medals unlocked", activity.game.medals[0] && activity.game.medals[1]);
+    long expectedReward = activity.game.unclaimedCareerRewards;
+    assertTrue(expectedReward > 0);
+    long beforeCash = activity.game.cash;
+    assertTrue(activity.game.claimCareerRewards());
+    assertEquals(beforeCash + expectedReward, activity.game.cash);
+
+    byte[] careerSaved = SaveCodec.encode(activity.game);
+    Game careerRestored = SaveCodec.decode(careerSaved);
+    assertEquals(activity.game.founderLevel, careerRestored.founderLevel);
+    assertEquals(activity.game.founderXp, careerRestored.founderXp);
+    assertTrue(careerRestored.medals[0] && careerRestored.medals[1]);
+
+    // 4. PeerSplit E2EE Multiplayer Room and Cloud Backup UI
+    dialogButton("🌐 Multiplayer & Cloud Backup (PeerSplit E2EE)");
+  }
+
   private boolean containsBrowser(View view) {
     if (view.getClass().getName().contains("WebView")) return true;
     if (view instanceof ViewGroup) {

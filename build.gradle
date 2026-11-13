@@ -7,8 +7,8 @@ android {
         applicationId 'com.lantern.dispatch'
         minSdk 26
         targetSdk 36
-        versionCode 9
-        versionName '1.1.1'
+        versionCode 12
+        versionName '1.3.0'
         testInstrumentationRunner 'android.test.InstrumentationTestRunner'
     }
     sourceSets {
@@ -60,7 +60,7 @@ dependencies {
 }
 
 tasks.register('compileEngineTests', JavaCompile) {
-    source files('src/com/lantern/dispatch/Game.java','src/com/lantern/dispatch/SaveCodec.java','src/com/lantern/dispatch/I18n.java','tests/GameTest.java','tests/SaveCodecTest.java')
+    source files('src/com/lantern/dispatch/Game.java','src/com/lantern/dispatch/SaveCodec.java','src/com/lantern/dispatch/I18n.java','src/com/lantern/dispatch/PeerSyncCrypto.java','src/com/lantern/dispatch/PeerMultiplayerSync.java','tests/GameTest.java','tests/SaveCodecTest.java')
     classpath=files()
     destinationDirectory=layout.buildDirectory.dir('engine-tests')
     options.encoding='UTF-8'

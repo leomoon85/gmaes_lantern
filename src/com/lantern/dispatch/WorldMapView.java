@@ -30,6 +30,7 @@ final class WorldMapView extends FrameLayout {
   private final Map<Integer, Marker> hubs = new HashMap<>(), vehicles = new HashMap<>();
   private final Map<Integer, Marker> rivalVehicles = new HashMap<>();
   private final ArrayList<Polyline> corridors = new ArrayList<>();
+  private final ArrayList<Polyline> activeRoutes = new ArrayList<>();
   private final HashMap<Integer, Icon> markerIcons = new HashMap<>();
   private final Runnable timeout = this::handleTimeout;
 
@@ -175,6 +176,7 @@ final class WorldMapView extends FrameLayout {
           vehicles.clear();
           rivalVehicles.clear();
           corridors.clear();
+          activeRoutes.clear();
           city = -1;
           networkHash = 0;
           tick();
@@ -202,6 +204,7 @@ final class WorldMapView extends FrameLayout {
       vehicles.clear();
       rivalVehicles.clear();
       corridors.clear();
+      activeRoutes.clear();
       city = game.scenarioId;
       networkHash = 0;
       for (int i = 0; i < 6; i++) {
@@ -219,7 +222,14 @@ final class WorldMapView extends FrameLayout {
     }
     for (int i = 0; i < 6; i++) {
       Game.District district = game.districts.get(i);
-      hubs.get(i).setSnippet(district.open ? "Level " + district.level : "Available to connect");
+      String rivalCorner = "";
+      for (Game.Company c : game.companies) {
+        if (!c.merged && c.district == i) {
+          rivalCorner = " · " + c.name + " Depot";
+          break;
+        }
+      }
+      hubs.get(i).setSnippet((district.open ? "Level " + district.level : "Available to connect") + rivalCorner);
       hubs.get(i).setIcon(hubIcon(district));
     }
     Set<Integer> alive = new HashSet<>();
@@ -250,32 +260,50 @@ final class WorldMapView extends FrameLayout {
         it.remove();
       }
     }
+    Set<Integer> aliveRivals = new HashSet<>();
     for (int i = 0; i < game.companies.size(); i++) {
       Game.Company rival = game.companies.get(i);
-      Marker marker = rivalVehicles.get(i);
-      if (rival.merged) {
-        if (marker != null) {
-          streetMap.removeMarker(marker);
-          rivalVehicles.remove(i);
+      if (rival.merged) continue;
+      int rivalCars = Math.max(1, Math.min(4, rival.fleet));
+      for (int f = 0; f < rivalCars; f++) {
+        int key = i * 10 + f;
+        aliveRivals.add(key);
+        double[] point;
+        if (f == 0 || rival.path == null || rival.path.length <= 1) {
+          int next =
+              rival.path != null && rival.at + 1 < rival.path.length
+                  ? rival.path[rival.at + 1]
+                  : rival.cell;
+          point = CityGeography.position(city, rival.cell, next, rival.progress);
+        } else {
+          int offset = f * (rival.path.length / (rivalCars + 1) + 1);
+          int vAt = (rival.at + offset) % (rival.path.length - 1);
+          int vNext = rival.path[vAt + 1];
+          double vProg = (rival.progress + f * 0.35) % 1.0;
+          point = CityGeography.position(city, rival.path[vAt], vNext, vProg);
         }
-        continue;
+        LatLng position = new LatLng(point[0], point[1]);
+        Marker marker = rivalVehicles.get(key);
+        if (marker == null) {
+          marker =
+              streetMap.addMarker(
+                  new MarkerOptions()
+                      .position(position)
+                      .icon(carIcon(rival.color, 101 + key))
+                      .title(rival.name + (f == 0 ? " (Flagship)" : " #" + (f + 1)))
+                      .snippet("Rival fleet vehicle"));
+          rivalVehicles.put(key, marker);
+        } else {
+          marker.setPosition(position);
+        }
       }
-      int next =
-          rival.path != null && rival.at + 1 < rival.path.length
-              ? rival.path[rival.at + 1]
-              : rival.cell;
-      double[] point = CityGeography.position(city, rival.cell, next, rival.progress);
-      LatLng position = new LatLng(point[0], point[1]);
-      if (marker == null)
-        rivalVehicles.put(
-            i,
-            streetMap.addMarker(
-                new MarkerOptions()
-                    .position(position)
-                    .icon(carIcon(rival.color, 101 + i))
-                    .title(rival.name)
-                    .snippet("Rival operator")));
-      else marker.setPosition(position);
+    }
+    for (Iterator<Map.Entry<Integer, Marker>> it = rivalVehicles.entrySet().iterator(); it.hasNext(); ) {
+      Map.Entry<Integer, Marker> entry = it.next();
+      if (!aliveRivals.contains(entry.getKey())) {
+        streetMap.removeMarker(entry.getValue());
+        it.remove();
+      }
     }
     int hash = Arrays.hashCode(game.corridorTier);
     if (hash != networkHash) {
@@ -294,6 +322,27 @@ final class WorldMapView extends FrameLayout {
               streetMap.addPolyline(
                   new PolylineOptions().addAll(points).color(Color.rgb(250, 189, 98)).width(3)));
         }
+    }
+    for (Polyline rLine : activeRoutes) streetMap.removePolyline(rLine);
+    activeRoutes.clear();
+    for (Game.Taxi vehicle : game.taxis) {
+      if ((vehicle.status == Game.PICKUP || vehicle.status == Game.RIDING)
+          && vehicle.path != null
+          && vehicle.at < vehicle.path.length - 1) {
+        ArrayList<LatLng> rPts = new ArrayList<>();
+        for (int s = Math.max(0, vehicle.at); s < vehicle.path.length; s++) {
+          double[] p = CityGeography.position(city, vehicle.path[s], vehicle.path[s], 0);
+          rPts.add(new LatLng(p[0], p[1]));
+        }
+        if (rPts.size() >= 2) {
+          activeRoutes.add(
+              streetMap.addPolyline(
+                  new PolylineOptions()
+                      .addAll(rPts)
+                      .color(vehicle.status == Game.RIDING ? Color.rgb(126, 226, 184) : Color.rgb(245, 196, 114))
+                      .width(4)));
+        }
+      }
     }
   }
 

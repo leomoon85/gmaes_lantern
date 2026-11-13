@@ -17,6 +17,28 @@ final class BackgroundMusic implements AutoCloseable {
       CUE_NEWS = 4,
       CUE_DISPATCH = 5;
 
+  static final int[] TRACK_IDS = {
+    R.raw.city_evening,
+    R.raw.rush_hour_express,
+    R.raw.boardroom_rag,
+    R.raw.harbor_bossa,
+    R.raw.midnight_maglev,
+    R.raw.exchange_blues
+  };
+
+  static final String[] TRACK_NAMES = {
+    "City Evening (Lounge)",
+    "Rush Hour Express (Funk)",
+    "RailBaron Stride (Ragtime)",
+    "Harbor Bossa (Tropico)",
+    "Midnight Maglev (Synth)",
+    "Exchange Floor (Swing)"
+  };
+
+  private static final long[] TRACK_CYCLE_MS = {
+    40000L, 31000L, 33100L, 35600L, 32500L, 36900L
+  };
+
   private final Context context;
   private final AudioManager audio;
   private final AudioAttributes attributes;
@@ -31,12 +53,15 @@ final class BackgroundMusic implements AutoCloseable {
   private MediaPlayer player;
   private boolean enabled,
       sfxEnabled = true,
+      autoRotate = true,
       foreground,
       requested,
       focused,
       closed,
       listening,
       interrupted;
+  private int trackIndex = 0;
+  private long trackStartedMs = 0L;
   private float baseVolume = 0.35f;
 
   private final BroadcastReceiver unplugged =
@@ -77,10 +102,53 @@ final class BackgroundMusic implements AutoCloseable {
     sfxEnabled = value;
   }
 
+  int trackCount() {
+    return TRACK_IDS.length;
+  }
+
+  int currentTrackIndex() {
+    return trackIndex;
+  }
+
+  String currentTrackName() {
+    return TRACK_NAMES[trackIndex];
+  }
+
+  boolean isAutoRotate() {
+    return autoRotate;
+  }
+
+  void setAutoRotate(boolean value) {
+    autoRotate = value;
+  }
+
+  void selectTrack(int index) {
+    if (closed) return;
+    int normalized = ((index % TRACK_IDS.length) + TRACK_IDS.length) % TRACK_IDS.length;
+    if (normalized == trackIndex && player != null) return;
+    trackIndex = normalized;
+    trackStartedMs = SystemClock.uptimeMillis();
+    releasePlayer();
+    if (enabled && foreground) playIfAllowed();
+  }
+
+  void nextTrack() {
+    selectTrack((trackIndex + 1) % TRACK_IDS.length);
+  }
+
   /** Modulate background music warmth & level dynamically based on traffic rush and game speed. */
   void updateAtmosphere(boolean rushHour, int speed, boolean urgentIncident) {
     if (closed || player == null || !focused) return;
     try {
+      if (autoRotate
+          && enabled
+          && speed > 0
+          && player.isPlaying()
+          && trackStartedMs > 0L
+          && SystemClock.uptimeMillis() - trackStartedMs >= TRACK_CYCLE_MS[trackIndex]) {
+        nextTrack();
+        return;
+      }
       float targetVol = speed == 0 ? 0.18f : (rushHour ? 0.44f : 0.34f);
       if (urgentIncident) targetVol = 0.22f; // Duck slightly so incident cue stands out
       baseVolume = targetVol;
@@ -222,11 +290,12 @@ final class BackgroundMusic implements AutoCloseable {
       }
       if (!focused) return;
       if (player == null) {
-        player = MediaPlayer.create(context, R.raw.city_evening, attributes, 0);
+        player = MediaPlayer.create(context, TRACK_IDS[trackIndex], attributes, 0);
         if (player == null) {
           stopPlayback();
           return;
         }
+        trackStartedMs = SystemClock.uptimeMillis();
         player.setLooping(true);
         player.setVolume(baseVolume, baseVolume);
         player.setOnErrorListener(

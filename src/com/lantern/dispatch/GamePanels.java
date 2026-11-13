@@ -95,7 +95,27 @@ final class GamePanels {
 
   private void fleet(LinearLayout parent) {
     Game game = g();
+    game.evaluateMedals();
     addCitySwitcherBannerIfMultiBranch(parent);
+    if (game.unclaimedCareerRewards > 0) {
+      LinearLayout rewardCard =
+          ui.card(
+              parent,
+              "🎁 Level & Medal Rewards Ready!",
+              "You reached Lv"
+                  + game.founderLevel
+                  + " ("
+                  + game.founderRankTitle()
+                  + ") · "
+                  + game.unlockedMedalCount()
+                  + "/12 Medals unlocked.");
+      Button claimBtn =
+          ui.button(
+              "🎁 Claim +" + Game.money(game.unclaimedCareerRewards) + " Bonus",
+              () -> perform(() -> g().claimCareerRewards()));
+      ui.primary(claimBtn);
+      rewardCard.addView(claimBtn);
+    }
     LinearLayout intro =
         ui.card(
             parent,
@@ -114,6 +134,10 @@ final class GamePanels {
         intro,
         "Upgrade next vehicle · " + Game.money(game.taxiUpgradePrice()),
         () -> g().upgradeTaxi());
+    intro.addView(
+        ui.buttonRow(
+            ui.button("Service All", () -> perform(() -> g().serviceAllTaxis())),
+            ui.button("Clean All", () -> perform(() -> g().cleanAllTaxis()))));
     intro.addView(ui.button("Business model · " + game.modelName(), () -> models()));
     float density = ui.getResources().getDisplayMetrics().density;
     for (int i = 0; i < game.taxis.size(); i++) {
@@ -122,29 +146,25 @@ final class GamePanels {
       Game.Driver assigned = game.driverFor(t);
       String driverLine =
           assigned != null
-              ? "Operator: " + assigned.name + " (Lv" + assigned.level + ")"
+              ? assigned.name + " (Lv" + assigned.level + ")"
               : (game.isStaffed(t)
-                  ? "Operator: Autonomous AI Drive"
-                  : "⚠ Unstaffed — Recruit a driver in Team");
+                  ? "Autonomous AI"
+                  : "⚠ Recruit driver in Team");
       LinearLayout c =
           ui.card(
               parent,
               "Vehicle " + t.id + " · " + t.tierName(),
-              new String[] {"Available", "Collecting passenger", "On a trip", "Turnaround"}
-                      [t.status]
+              new String[] {"Available", "Picking up", "On trip", "Turnaround"}[t.status]
                   + " · "
                   + driverLine
-                  + "\nComfort Lv"
-                  + t.comfortLevel
-                  + " · Capacity "
-                  + t.capacity
-                  + " pax");
+                  + " · Comfort Lv"
+                  + t.comfortLevel);
       int condPct = (int) Math.round(t.condition);
       int cleanPct = (int) Math.round(t.cleanliness);
       c.addView(
           BrandArt.meterRow(
               ui,
-              "Mechanical Integrity",
+              "Mechanical",
               condPct,
               condPct >= 70 ? 0xff7ee2b8 : condPct >= 35 ? 0xfff5c472 : 0xffef9078,
               condPct + "%",
@@ -152,21 +172,31 @@ final class GamePanels {
       c.addView(
           BrandArt.meterRow(
               ui,
-              "Cabin Cleanliness",
+              "Cleanliness",
               cleanPct,
               cleanPct >= 75 ? 0xff73d6cf : cleanPct >= 50 ? 0xfff5c472 : 0xffef9078,
               cleanPct + "%",
               density));
-      action(
-          c,
-          "Service · " + Game.money(game.managers.get(0).hired ? 220 : 300),
-          () -> g().serviceTaxi(index));
-      action(c, "Clean · 120 cr", () -> g().cleanTaxi(index));
-      action(
-          c,
-          "Improve comfort · " + Game.money(600L * t.comfortLevel),
-          () -> g().upgradeComfort(index));
-      c.addView(ui.button("Route · " + t.routeStops.size() + " hubs", () -> editRoute(index)));
+      c.addView(
+          ui.buttonRow(
+              ui.button(
+                  "Service · " + Game.money(game.managers.get(0).hired ? 220 : 300),
+                  () -> perform(() -> g().serviceTaxi(index))),
+              ui.button("Clean · " + Game.money(120), () -> perform(() -> g().cleanTaxi(index)))));
+      if (assigned == null && !game.isStaffed(t)) {
+        Button recruitBtn =
+            ui.button(
+                "Recruit Driver · " + Game.money(450),
+                () -> perform(() -> g().recruitDriver(null)));
+        ui.primary(recruitBtn);
+        c.addView(recruitBtn);
+      }
+      c.addView(
+          ui.buttonRow(
+              ui.button(
+                  "Comfort · " + Game.money(600L * t.comfortLevel),
+                  () -> perform(() -> g().upgradeComfort(index))),
+              ui.button("Route · " + t.routeStops.size() + " hubs", () -> editRoute(index))));
       c.addView(
           ui.button(
               t.strictRoute
@@ -250,12 +280,8 @@ final class GamePanels {
               parent,
               d.name + (d.open ? " · " + d.levelName() : ""),
               d.open
-                  ? "Level "
-                      + d.level
-                      + " · "
-                      + d.specialty
-                      + (facInfo.length() > 0 ? "\nFacilities:" + facInfo : "")
-                  : "Landmark: " + d.landmark + " · Ready for expansion");
+                  ? "Lv" + d.level + " · " + d.specialty + facInfo
+                  : d.landmark + " · Locked");
       if (d.open) {
         int avgDemand =
             (d.demandMult[0] + d.demandMult[1] + d.demandMult[2] + d.demandMult[3]) / 4;
@@ -440,8 +466,12 @@ final class GamePanels {
               fatiguePct >= 80 ? 0xffef9078 : fatiguePct >= 45 ? 0xfff5c472 : 0xff7ee2b8,
               fatiguePct + "%",
               density));
-      action(c, "Train · " + Game.money(350L * d.level), () -> g().trainDriver(index));
-      action(c, "Rest driver", () -> g().restDriver(index));
+      c.addView(
+          ui.buttonRow(
+              ui.button(
+                  "Train · " + Game.money(350L * d.level),
+                  () -> perform(() -> g().trainDriver(index))),
+              ui.button("Rest driver", () -> perform(() -> g().restDriver(index)))));
     }
     String[] perks = {
       "Auto-repairs vehicles < 70% & cuts service cost",
@@ -459,37 +489,68 @@ final class GamePanels {
               parent,
               m.role + " · " + m.name,
               (m.hired
-                      ? "✓ Active in Executive Cabinet · "
-                      : "Recruitment · " + Game.money(m.cost) + " · ")
+                      ? "✓ Active · "
+                      : Game.money(m.cost) + " · ")
                   + perk);
       if (!m.hired) action(c, "Hire manager", () -> g().hireManager(index));
     }
-    for (Game.Review r : game.reviews)
-      ui.card(parent, r.stars + " stars · " + r.passenger, r.comment);
+    for (int i = 0; i < Math.min(3, game.reviews.size()); i++) {
+      Game.Review r = game.reviews.get(i);
+      ui.card(parent, r.stars + "★ · " + r.passenger, r.comment);
+    }
   }
 
   private void market(LinearLayout parent) {
     Game game = g();
     float density = ui.getResources().getDisplayMetrics().density;
 
+    int totalCityFleet = game.taxis.size();
+    for (Game.Company c : game.companies) if (!c.merged) totalCityFleet += c.fleet;
+    totalCityFleet = Math.max(1, totalCityFleet);
+    LinearLayout shareCard =
+        ui.card(
+            parent,
+            game.currentScenario().city + " Market Share & Rivalry",
+            "Active city fleet: " + totalCityFleet + " vehicles across competing operators");
+    int playerPct = Math.round(game.taxis.size() * 100f / totalCityFleet);
+    shareCard.addView(
+        BrandArt.meterRow(
+            ui,
+            game.companyName + " (You · " + game.rides + " trips)",
+            playerPct,
+            0xff77d7c8,
+            game.taxis.size() + " cars · " + playerPct + "%",
+            density));
+    for (Game.Company c : game.companies) {
+      if (c.merged) continue;
+      int pct = Math.round(c.fleet * 100f / totalCityFleet);
+      shareCard.addView(
+          BrandArt.meterRow(
+              ui,
+              c.name + " (" + c.served + " trips)",
+              pct,
+              c.color,
+              c.fleet + " cars · " + pct + "%",
+              density));
+      TextView act = ui.text("  ↳ " + c.lastAction, 11, MainActivity.MUTED, false);
+      act.setPadding(0, 0, 0, ui.dp(4));
+      shareCard.addView(act);
+    }
+
     // 1. ENTREPRENEUR / CEO PERSONAL WEALTH LEDGER (Distinct from Company Balance Sheet)
     LinearLayout entrepreneurCard =
         ui.card(
             parent,
-            "👤 Entrepreneur & CEO Ledger · " + game.founderName,
-            "Entrepreneur Net Worth: "
+            "👤 " + game.founderName + " · Entrepreneur",
+            "Net Worth: "
                 + Game.money(game.entrepreneurNetWorth())
                 + " · Personal Cash: "
                 + Game.money(game.founderCash)
-                + "\nActive CEO Seat (1 Co. Limit): "
+                + "\nCEO of: "
                 + game.activeFounderCeoCompanyName()
-                + "\nQuarterly CEO Salary: "
+                + " · Salary: "
                 + Game.money(game.founderSalaryRate)
-                + " / qtr · Total Salary Earned: "
-                + Game.money(game.founderTotalSalary)
-                + "\nPersonal Dividends Earned: "
-                + Game.money(game.founderTotalDividends)
-                + " · Companies Owned: "
+                + "/qtr · Companies: "
                 + game.ownedCompanyCount());
 
     Button salaryBtn =
@@ -529,30 +590,17 @@ final class GamePanels {
     LinearLayout balance =
         ui.card(
             parent,
-            "🏛 Corporate Balance Sheet · " + game.companyName,
-            "Active Company CEO: "
-                + game.flagshipCeoName()
-                + (game.isFounderFlagshipCeo()
-                    ? " (Founder-CEO · +10% Fare Efficiency)"
-                    : " (Hired Professional CEO · 250 cr/qtr)")
-                + "\nCompany Net Worth: "
+            "🏛 " + game.companyName + " · Balance Sheet",
+            "Worth: "
                 + Game.money(game.companyNetWorth())
-                + " · Corporate Treasury: "
+                + " · Cash: "
                 + Game.money(game.cash)
-                + "\nFounder Ownership: "
+                + " · Stake: "
                 + game.founderEquityPct
-                + "% · Outside Shareholders: "
-                + (100 - game.founderEquityPct)
-                + "%\nRevenue: "
-                + Game.money(game.revenue)
-                + " · Expenses: "
-                + Game.money(game.expenses)
-                + "\nMargin Debt: "
-                + Game.money(game.marginDebt)
-                + " · Bonds: "
-                + Game.money(game.bondDebt())
-                + " · Dividends Paid: "
-                + Game.money(game.dividends));
+                + "%\nCEO: "
+                + game.flagshipCeoName()
+                + " · Debt: "
+                + Game.money(game.marginDebt + game.bondDebt()));
 
     Button createCo =
         ui.button(
@@ -686,42 +734,39 @@ final class GamePanels {
     }
 
     // Active AI Rivals on the Share Market
-    ui.card(
-        parent,
-        game.currentScenario().city + " Stock Exchange & AI Rivals",
-        "AI competitors actively buy vehicles, open hubs, and poach unserved trips. Acquire 60% equity to force a buyout merger.");
+    LinearLayout marketHeader =
+        ui.card(
+            parent,
+            game.currentScenario().city + " Stock Exchange & Rivals",
+            "Acquire 60% equity in rival companies to force a buyout merger. You can also import human peer companies via PeerSplit E2EE.");
+    Button peerBtn =
+        ui.button(
+            "🌐 Multiplayer Room & Peer Backup (PeerSplit E2EE)",
+            () -> ui.showPeerMultiplayerModal());
+    ui.primary(peerBtn);
+    marketHeader.addView(peerBtn);
+
     for (int i = 0; i < game.companies.size(); i++) {
       final int index = i;
       Game.Company c = game.companies.get(i);
       LinearLayout company =
           ui.card(
               parent,
-              c.name + " · [" + c.strategyName() + "]",
+              c.name + " · " + c.strategyName(),
               c.merged
-                  ? "✓ Acquired & Merged into " + game.companyName
+                  ? "✓ Acquired & Merged"
                   : Game.money(c.price)
-                      + " / share · You own "
+                      + "/share · Owned: "
                       + c.owned
-                      + "%\n"
-                      + "AI Fleet: "
+                      + "% · Fleet: "
                       + c.fleet
-                      + " vehicles · Hubs: "
-                      + c.hubsOpen
-                      + " · Track: Tier "
-                      + c.corridorLevel
-                      + "\n"
-                      + "Trips Hauled: "
-                      + c.served
-                      + " · AI Cash: "
-                      + Game.money(c.cash)
-                      + "\n"
-                      + "⚡ Latest Move: "
+                      + "\n⚡ "
                       + c.lastAction);
       if (c.merged) continue;
       company.addView(
           BrandArt.meterRow(
               ui,
-              "Voting Control (60% needed to merge)",
+              "Voting Control (60% to merge)",
               c.owned,
               c.owned >= 60 ? 0xff7ee2b8 : 0xfff5c472,
               c.owned + "%",
@@ -729,29 +774,28 @@ final class GamePanels {
       company.addView(
           new PriceGraph(ui, c.priceHistory, c.color),
           new LinearLayout.LayoutParams(-1, ui.dp(55)));
-      action(
-          company,
-          "Buy 10 shares · " + Game.money(c.price * 10L),
-          () -> g().buyShares(index, false));
       company.addView(
-          ui.button(
-              "Buy on margin · " + Game.money(c.price * 5L) + " cash",
-              () ->
-                  ui.confirm(
-                      "Borrow to invest?",
-                      "Half the purchase cost is borrowed. Quarterly interest is 2%. Below 30%"
-                          + " equity your portfolio is sold to settle debt.",
-                      () -> perform(() -> g().buyShares(index, true)))));
-      action(company, "Sell 10 shares", () -> g().sellShares(index));
+          ui.buttonRow(
+              ui.button(
+                  "Buy 10 · " + Game.money(c.price * 10L),
+                  () -> perform(() -> g().buyShares(index, false))),
+              ui.button("Sell 10", () -> perform(() -> g().sellShares(index)))));
       company.addView(
-          ui.button(
-              "Acquire & Merge · " + Game.money(game.mergerPrice(index)),
-              () ->
-                  ui.confirm(
-                      "Acquire " + c.name + "?",
-                      "Requires a 60% stake, no margin debt, and payment for the remaining shares"
-                          + " plus integration.",
-                      () -> perform(() -> g().merge(index)))));
+          ui.buttonRow(
+              ui.button(
+                  "Margin · " + Game.money(c.price * 5L),
+                  () ->
+                      ui.confirm(
+                          "Borrow to invest?",
+                          "Half the purchase cost is borrowed at 2% quarterly interest.",
+                          () -> perform(() -> g().buyShares(index, true)))),
+              ui.button(
+                  "Merge · " + Game.money(game.mergerPrice(index)),
+                  () ->
+                      ui.confirm(
+                          "Acquire " + c.name + "?",
+                          "Requires a 60% stake and zero margin debt.",
+                          () -> perform(() -> g().merge(index))))));
     }
     LinearLayout history =
         ui.card(
@@ -881,7 +925,80 @@ final class GamePanels {
 
   void overview() {
     Game game = g();
+    game.evaluateMedals();
+    float density = ui.getResources().getDisplayMetrics().density;
     LinearLayout body = ui.vertical();
+
+    LinearLayout career = ui.vertical();
+    career.setPadding(ui.dp(14), ui.dp(12), ui.dp(14), ui.dp(12));
+    career.setBackground(ui.shape(0xff182b44, 14));
+    LinearLayout.LayoutParams careerLp = new LinearLayout.LayoutParams(-1, -2);
+    careerLp.bottomMargin = ui.dp(10);
+    career.addView(
+        ui.text(
+            "🎖 Lv"
+                + game.founderLevel
+                + " "
+                + game.founderRankTitle()
+                + "  ·  🔥 Day "
+                + game.dailyStreak
+                + " Streak",
+            15,
+            MainActivity.AMBER,
+            true));
+    career.addView(
+        BrandArt.meterRow(
+            ui,
+            "Career XP (Next Lv" + (game.founderLevel + 1) + ")",
+            game.xpProgressPct(),
+            MainActivity.AMBER,
+            game.founderXp + " / " + game.xpForNextLevel(),
+            density));
+    int nextMedal = game.nextLockedMedalIndex();
+    String nearMiss =
+        nextMedal >= 0
+            ? "Next Medal: 🏅 "
+                + Game.MEDAL_NAMES[nextMedal]
+                + " (+"
+                + Game.MEDAL_REWARDS[nextMedal]
+                + " cr) — "
+                + game.medalProgressText(nextMedal)
+            : "🏆 All 12 Executive Medals Unlocked!";
+    TextView nearText = ui.text(nearMiss, 12, MainActivity.MINT, true);
+    LinearLayout.LayoutParams nearLp = new LinearLayout.LayoutParams(-1, -2);
+    nearLp.topMargin = ui.dp(6);
+    career.addView(nearText, nearLp);
+    if (game.unclaimedCareerRewards > 0) {
+      Button claimBtn =
+          ui.button(
+              "🎁 Claim Level & Medal Rewards (+" + Game.money(game.unclaimedCareerRewards) + ")",
+              () -> {
+                perform(() -> g().claimCareerRewards());
+                ui.dismissCurrent();
+                overview();
+              });
+      ui.primary(claimBtn);
+      career.addView(claimBtn);
+    }
+    Button medalsBtn =
+        ui.button(
+            "🏅 Open Trophy & Medal Cabinet (" + game.unlockedMedalCount() + " / 12)",
+            () -> {
+              ui.dismissCurrent();
+              showMedalsModal();
+            });
+    career.addView(medalsBtn);
+
+    Button ledgerBtn =
+        ui.button(
+            "📊 Company Performance Ledger & Investors Review",
+            () -> {
+              ui.dismissCurrent();
+              ui.showAnnualMeetingModal();
+            });
+    career.addView(ledgerBtn);
+    body.addView(career, careerLp);
+
     LinearLayout stats = ui.vertical();
     stats.setPadding(ui.dp(14), ui.dp(12), ui.dp(14), ui.dp(12));
     stats.setBackground(ui.shape(0xff101d30, 14));
@@ -951,6 +1068,82 @@ final class GamePanels {
         "Current Objective: " + game.objectiveText(),
         body,
         "Keep Building",
+        null);
+  }
+
+  void showMedalsModal() {
+    Game game = g();
+    game.evaluateMedals();
+    float density = ui.getResources().getDisplayMetrics().density;
+    LinearLayout body = ui.vertical();
+
+    LinearLayout rankCard = ui.vertical();
+    rankCard.setPadding(ui.dp(14), ui.dp(12), ui.dp(14), ui.dp(12));
+    rankCard.setBackground(ui.shape(0xff182b44, 14));
+    rankCard.addView(
+        ui.text(
+            "🎖 Level "
+                + game.founderLevel
+                + " · "
+                + game.founderRankTitle()
+                + " · 🔥 Day "
+                + game.dailyStreak
+                + " Streak",
+            15,
+            MainActivity.AMBER,
+            true));
+    rankCard.addView(
+        BrandArt.meterRow(
+            ui,
+            "XP to Lv" + (game.founderLevel + 1),
+            game.xpProgressPct(),
+            MainActivity.AMBER,
+            game.founderXp + " / " + game.xpForNextLevel() + " XP",
+            density));
+    if (game.unclaimedCareerRewards > 0) {
+      Button claim =
+          ui.button(
+              "🎁 Claim +" + Game.money(game.unclaimedCareerRewards) + " Rewards",
+              () -> {
+                perform(() -> g().claimCareerRewards());
+                ui.dismissCurrent();
+                showMedalsModal();
+              });
+      ui.primary(claim);
+      rankCard.addView(claim);
+    }
+    body.addView(rankCard);
+
+    for (int i = 0; i < Game.MEDAL_NAMES.length; i++) {
+      boolean unlocked = game.medals[i];
+      LinearLayout row = ui.vertical();
+      row.setPadding(ui.dp(12), ui.dp(10), ui.dp(12), ui.dp(10));
+      row.setBackground(ui.shape(unlocked ? 0xff16332c : 0xff101d30, 12));
+      LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(-1, -2);
+      rlp.topMargin = ui.dp(6);
+      String heading =
+          (unlocked ? "🏅 [UNLOCKED] " : "🔒 ")
+              + Game.MEDAL_NAMES[i]
+              + "  (+"
+              + Game.money(Game.MEDAL_REWARDS[i])
+              + ")";
+      row.addView(ui.text(heading, 14, unlocked ? MainActivity.AMBER : MainActivity.INK, true));
+      String detail =
+          Game.MEDAL_DESCS[i]
+              + (unlocked ? "" : "\nProgress: " + game.medalProgressText(i));
+      TextView dView = ui.text(detail, 12, unlocked ? MainActivity.MINT : MainActivity.MUTED, false);
+      LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(-1, -2);
+      dlp.topMargin = ui.dp(3);
+      row.addView(dView, dlp);
+      body.addView(row, rlp);
+    }
+
+    ui.showThemedModal(
+        "TROPHY & MEDAL CABINET",
+        game.unlockedMedalCount() + " / 12 Executive Medals Unlocked",
+        "Complete trips, open hubs, upgrade fleets & merge rivals to earn XP and cash grants.",
+        body,
+        "Back to Empire",
         null);
   }
 

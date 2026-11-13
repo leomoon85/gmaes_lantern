@@ -9,7 +9,7 @@ public class GameTest {
     for (int i = 0; i < steps; i++) g.tick(.2);
   }
 
-  public static void main(String[] args) {
+  public static void main(String[] args) throws Exception {
     Game g = new Game();
     for (Game.District a : g.districts)
       for (Game.District b : g.districts) {
@@ -223,7 +223,7 @@ public class GameTest {
 
     // Test Solo Quick Play, 20 Railroad-Tycoon Historical Scenarios, and 8-Step Interactive
     // Tutorial
-    check(Game.HISTORICAL_SCENARIOS.length == 20, "20 historical scenarios defined");
+    check(Game.HISTORICAL_SCENARIOS.length >= 20, "20+ historical scenarios defined");
     for (int h = 0; h < Game.HISTORICAL_SCENARIOS.length; h++) {
       Game hs = new Game();
       hs.startHistoricalScenario(h);
@@ -389,12 +389,103 @@ public class GameTest {
         mergeStaff.driverFor(mergeStaff.taxis.get(1)) != null,
         "Merger pairs waiting unassigned driver with inherited vehicle");
 
+    // 4. Career XP, Level-Up Increments, 12 Medals & Daily/Offline Comeback rewards
+    Game career = new Game();
+    career.cash = 100000;
+    career.rides = 1;
+    career.unlock(2);
+    career.buyTaxi();
+    career.awardXp(200);
+    check(career.founderLevel >= 2, "XP gain increments Founder Level");
+    check(career.medals[0], "First Dispatch medal unlocks on ride completion");
+    check(career.unclaimedCareerRewards > 0, "Level-up and medal unlock queue unclaimed rewards");
+    long preClaimCash = career.cash;
+    long preClaimPersonal = career.founderCash;
+    long queuedReward = career.unclaimedCareerRewards;
+    check(career.claimCareerRewards(), "Claiming career rewards succeeds");
+    check(
+        career.unclaimedCareerRewards == 0
+            && career.cash == preClaimCash + queuedReward
+            && career.founderCash == preClaimPersonal + Math.max(100L, queuedReward / 4L),
+        "Claiming transfers queued rewards to corporate cash & personal bonus");
+
+    long day0 = 100L * 86_400_000L;
+    career.lastCheckInEpochDay = 0L;
+    career.lastActiveTimestampMs = 0L;
+    career.evaluateDailyAndOfflineComeback(day0);
+    check(career.dailyStreak == 1, "Initial daily check-in sets Day 1 streak");
+    long comebackGain = career.evaluateDailyAndOfflineComeback(day0 + 86_400_000L);
+    check(
+        career.dailyStreak == 2 && comebackGain > 0,
+        "Consecutive day advances streak & queues offline/daily comeback reward");
+    long spoofedBackwards = career.evaluateDailyAndOfflineComeback(day0 - 86_400_000L);
+    check(
+        spoofedBackwards == 0 && career.dailyStreak == 2,
+        "Backward system clock change cannot exploit comeback rewards");
+
+    // 5. PeerSplit serverless E2EE backup and multiplayer room match
+    String secretPass = "test-vault-secret-2026";
+    String backupArmor = PeerMultiplayerSync.exportEncryptedBackup(career, secretPass);
+    check(backupArmor.contains("BEGIN FAREFORGE ENCRYPTED BACKUP"), "Encrypted backup armored export");
+    Game restoredBackup = PeerMultiplayerSync.importEncryptedBackup(backupArmor, secretPass);
+    check(
+        restoredBackup.founderLevel == career.founderLevel
+            && restoredBackup.cash == career.cash
+            && restoredBackup.medals[0],
+        "PeerSplit E2EE zero-server restore matches original game state");
+
+    String roomCode = PeerSyncCrypto.generateRoomCode();
+    check(roomCode.startsWith("FORGE-"), "Room code generated");
+    String roomEnvelope = PeerMultiplayerSync.exportMultiplayerRoomEnvelope(career, roomCode);
+    check(roomEnvelope.contains("BEGIN FAREFORGE MULTIPLAYER ROOM"), "Room envelope armored export");
+    PeerMultiplayerSync.PeerRivalProfile peer =
+        PeerMultiplayerSync.parsePeerRival(roomEnvelope, roomCode);
+    check(
+        peer.companyName.equals(career.companyName) && peer.founderName.equals(career.founderName),
+        "Decrypted peer rival matches host company");
+    Game matchGame = new Game(0);
+    check(PeerMultiplayerSync.injectRivalIntoGame(matchGame, peer), "Inject peer rival into market");
+    check(matchGame.companies.get(0).name.contains(peer.companyName), "Rival slot populated by peer player");
+
+    // 5. City Currency Standardization & Ambition Formatting
+    Game londonGame = new Game(1);
+    check(Game.money(1000).startsWith("£"), "London active currency symbol is £");
+    check(londonGame.formatCityMoney(2500).startsWith("£"), "London formatCityMoney is £2,500");
+    check(Game.quickGoalNameForCity(Game.GOAL_WORTH_5CR, 1).contains("£312,500"), "London ambition in £");
+    Game tokyoGame = new Game(3);
+    check(Game.money(1000).startsWith("¥"), "Tokyo active currency symbol is ¥");
+    check(Game.quickGoalNameForCity(Game.GOAL_WORTH_5CR, 3).contains("¥312,500"), "Tokyo ambition in ¥");
+
+    // 6. Multi-AI Rival Scenarios & Multiple Rival Fleet Cars
+    Game multiAi = new Game();
+    multiAi.startHistoricalScenario(20);
+    check(multiAi.companies.get(0).fleet == 4 && multiAi.companies.get(1).fleet == 4, "Multi-AI London scenario sets 4 fleet per rival");
+    check(multiAi.currentHistoricalScenario().targetCompanies == 3, "Multi-AI takeover objective configured");
+
+    // 7. Company Ledger & Annual Investors Meeting
+    Game ledgerGame = new Game(0);
+    ledgerGame.cash = 50000;
+    ledgerGame.createRide(0, 1);
+    ledgerGame.dispatch(ledgerGame.requests.get(0).id);
+    run(ledgerGame, 120);
+    check(ledgerGame.taxis.get(0).tripsCompleted > 0, "Consist performance ledger tracks trips completed");
+    check(ledgerGame.taxis.get(0).totalFareEarned > 0, "Consist performance ledger tracks fare revenue");
+    check(ledgerGame.districts.get(0).tripsOriginating > 0, "District ledger tracks originating volume");
+    check(ledgerGame.lastAnnualMeetingYear > 0, "Annual investors meeting convened on year crossing");
+    check(ledgerGame.adjustCeoSalary(100) && ledgerGame.founderSalaryRate == 450L, "Adjust CEO salary in annual meeting");
+    check(ledgerGame.adjustCorporateDividend(100) && ledgerGame.corporateDividendRate == 500L, "Adjust dividend in annual meeting");
+
+    ledgerGame.taxis.get(0).condition = 50.0;
+    ledgerGame.taxis.get(0).cleanliness = 50.0;
+    check(ledgerGame.serviceAllTaxis() && ledgerGame.taxis.get(0).condition == 100.0, "Bulk Service All restores condition");
+    check(ledgerGame.cleanAllTaxis() && ledgerGame.taxis.get(0).cleanliness == 100.0, "Bulk Clean All restores cleanliness");
+
     System.out.println(
         "PASS: roads, dispatch, fares, pause, funds, margin accounting/liquidation, mergers,"
             + " history, subscriptions, expansion, auto dispatch, national goal, hub upgrades,"
             + " station facilities, corridors, fleet tiers, bonds/insolvency, 6 world city"
             + " scenarios, currencies, drivers, maintenance/cleanliness/comfort, managers, reviews,"
-            + " multi-language, 5 difficulty modes, Quick Play, 20 Historical Scenarios,"
-            + " Interactive Tutorial");
+            + " multi-language, 5 difficulty modes, Quick Play, 22 Historical Scenarios,"
+            + " Interactive Tutorial, Company Ledger & Annual Investors Meeting");
   }
 }

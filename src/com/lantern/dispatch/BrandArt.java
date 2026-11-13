@@ -135,7 +135,7 @@ final class BrandArt extends View {
     TextView left = new TextView(ctx);
     left.setText(label);
     left.setTextColor(0xffb8c7d9);
-    left.setTextSize(10.5f);
+    left.setTextSize(12.5f);
     left.setTypeface(Typeface.DEFAULT_BOLD);
     top.addView(
         left,
@@ -144,7 +144,7 @@ final class BrandArt extends View {
     TextView right = new TextView(ctx);
     right.setText(rightText != null ? rightText : (clamped + "%"));
     right.setTextColor(fillColor);
-    right.setTextSize(10.5f);
+    right.setTextSize(12.5f);
     right.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
     top.addView(right);
     wrap.addView(top);
@@ -158,7 +158,7 @@ final class BrandArt extends View {
     track.setBackground(trackBg);
     LinearLayout.LayoutParams trackLp =
         new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, Math.round(7 * density));
+            LinearLayout.LayoutParams.MATCH_PARENT, Math.round(9 * density));
     trackLp.topMargin = Math.round(2 * density);
     track.setLayoutParams(trackLp);
 
@@ -224,6 +224,87 @@ final class BrandArt extends View {
         star.lineTo(cx - r * 0.16f, cy - r * 0.16f);
         star.close();
         canvas.drawPath(star, paint);
+      }
+
+      @Override
+      public void setAlpha(int alpha) {
+        paint.setAlpha(alpha);
+      }
+
+      @Override
+      public void setColorFilter(ColorFilter colorFilter) {
+        paint.setColorFilter(colorFilter);
+      }
+
+      @Override
+      public int getOpacity() {
+        return PixelFormat.TRANSLUCENT;
+      }
+    };
+  }
+
+  /** Illustrated character guide portrait (Chief Dispatcher Maya) for the step-by-step tutorial. */
+  static Drawable advisorPortraitDrawable(final float density) {
+    return new Drawable() {
+      final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+      @Override
+      public int getIntrinsicWidth() {
+        return Math.round(48 * density);
+      }
+
+      @Override
+      public int getIntrinsicHeight() {
+        return Math.round(48 * density);
+      }
+
+      @Override
+      public void draw(Canvas canvas) {
+        Rect b = getBounds();
+        float cx = b.exactCenterX(), cy = b.exactCenterY();
+        float r = Math.min(b.width(), b.height()) * 0.46f;
+        // Circular badge backdrop
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xff17344f);
+        canvas.drawCircle(cx, cy, r, paint);
+        // Uniform shoulders
+        paint.setColor(0xff264e73);
+        canvas.drawArc(
+            cx - r * 0.78f, cy + r * 0.28f, cx + r * 0.78f, cy + r * 1.15f, 180, 180, true, paint);
+        // Brass tie / collar pin
+        paint.setColor(0xffedbb73);
+        canvas.drawCircle(cx, cy + r * 0.62f, r * 0.11f, paint);
+        // Hair behind face
+        paint.setColor(0xff2c1f24);
+        canvas.drawCircle(cx, cy - r * 0.04f, r * 0.48f, paint);
+        // Face
+        paint.setColor(0xffebb88b);
+        canvas.drawCircle(cx, cy + r * 0.02f, r * 0.36f, paint);
+        // Dispatcher cap & gold visor
+        paint.setColor(0xff1d3d5c);
+        canvas.drawArc(
+            cx - r * 0.40f, cy - r * 0.56f, cx + r * 0.40f, cy + r * 0.05f, 180, 180, true, paint);
+        paint.setColor(0xffedbb73);
+        canvas.drawRoundRect(
+            cx - r * 0.38f, cy - r * 0.24f, cx + r * 0.38f, cy - r * 0.14f, r * 0.05f, r * 0.05f, paint);
+        // Cap crest dot
+        canvas.drawCircle(cx, cy - r * 0.36f, r * 0.07f, paint);
+        // Eyes & friendly smile
+        paint.setColor(0xff101d30);
+        canvas.drawCircle(cx - r * 0.12f, cy - r * 0.02f, r * 0.05f, paint);
+        canvas.drawCircle(cx + r * 0.12f, cy - r * 0.02f, r * 0.05f, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(Math.max(1.2f, 1.3f * density));
+        canvas.drawArc(
+            cx - r * 0.13f, cy + r * 0.06f, cx + r * 0.13f, cy + r * 0.22f, 15, 150, false, paint);
+        // Radio headset boom mic
+        paint.setColor(0xff77d7c8);
+        paint.setStrokeWidth(Math.max(1.4f, 1.5f * density));
+        canvas.drawLine(cx - r * 0.37f, cy + r * 0.04f, cx - r * 0.12f, cy + r * 0.22f, paint);
+        // Gold portrait frame ring
+        paint.setColor(0xffedbb73);
+        paint.setStrokeWidth(Math.max(1.6f, 1.9f * density));
+        canvas.drawCircle(cx, cy, r, paint);
       }
 
       @Override
